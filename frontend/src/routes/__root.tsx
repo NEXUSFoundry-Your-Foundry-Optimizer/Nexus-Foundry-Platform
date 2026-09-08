@@ -123,6 +123,15 @@ function RootComponent() {
   });
   const isRagPage = pathname.startsWith("/agent/rag");
 
+  useEffect(() => {
+    // Auto-start live simulation stream on frontend mount
+    fetch("http://localhost:8000/api/v1/simulation/start?dataset_name=furnace_sensor.csv&speed=1.0", {
+      method: "POST"
+    }).catch(() => {
+      // Backend handles simulation loop
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex min-h-screen flex-col bg-background">

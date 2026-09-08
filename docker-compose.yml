@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # Mosquitto MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: nexus_mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: nexus_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # Kafka Event Bus
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: nexus_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # PostgreSQL Relational DB
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus_postgres
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexuspass
+      POSTGRES_DB: nexus_foundry
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # InfluxDB Time Series DB
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: nexus_influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: nexus
+      DOCKER_INFLUXDB_INIT_PASSWORD: nexuspass2026
+      DOCKER_INFLUXDB_INIT_ORG: nexus_org
+      DOCKER_INFLUXDB_INIT_BUCKET: sensor_data
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: nexus-influx-super-token-2026
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+
+  # Redis Cache & Real-Time State
+  redis:
+    image: redis:7-alpine
+    container_name: nexus_redis
+    ports:
+      - "6379:6379"
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: nexus_otel_collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus metrics
+
+  # Grafana Observability Dashboard
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: nexus_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - otel-collector
+
+  # FastAPI Backend Gateway & Simulator Services
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexus_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MQTT_BROKER_HOST=mosquitto
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - POSTGRES_HOST=postgres
+      - INFLUXDB_URL=http://influxdb:8086
+      - REDIS_HOST=redis
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      - mosquitto
+      - kafka
+      - postgres
+      - influxdb
+      - redis
+
+volumes:
+  postgres_data:
+  influxdb_data:

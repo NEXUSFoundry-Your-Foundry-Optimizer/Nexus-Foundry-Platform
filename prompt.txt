@@ -1,0 +1,70 @@
+Build a single-page, scrolling marketing/documentation website for a college AI/software project called "NEXUS-Foundry", using this Framer site purely as the STRUCTURAL AND STYLE reference (section order, layout rhythm, spacing, card patterns, animations, typography scale — not its literal color palette or business-consulting copy):
+https://defiant-company-912806.framer.app/
+
+I've attached three markdown files (01_ARCHITECTURE.md, 02_WORKFLOW_AND_REQUIREMENTS.md, 03_FRONTEND.md) — use them as the SOLE source of truth for all content, numbers, and terminology. Do not invent facts; every stat, model name, and requirement must come from these files.
+
+TECH REQUIREMENTS
+- React + TypeScript + Tailwind CSS, single page (no backend, no auth, no forms that submit anywhere real).
+- Fully responsive (mobile, tablet, desktop). Smooth-scroll anchor navigation.
+- Use subtle scroll-reveal/fade-in animations on sections, matching the reference site's polish level, but keep it lightweight — no video backgrounds.
+- Fonts: a clean modern sans-serif for body text, a slightly heavier/tighter sans for headings (system font stack or Inter/Space Grotesk is fine).
+
+VISUAL DIRECTION (deliberately different from the reference's beige consulting look)
+- Theme: dark, technical, "industrial AI" — deep navy/charcoal background (#0B0F17 – #10151F range), off-white text, with a molten-metal amber/orange accent (#F5A524-ish) used sparingly for CTAs, active states, and key numbers — evokes foundry heat without being garish.
+- Status colors used consistently wherever alerts/severity appear: green = normal, amber/yellow = warning, red = critical.
+- Cards should have a subtle border + soft glow on hover, not flat drop shadows.
+
+SITE STRUCTURE — build these sections top to bottom, in this order:
+
+1. NAVBAR (sticky)
+Logo/wordmark "NEXUS-Foundry". Links: Overview, Architecture, Digital Twins, AI Models, Workflow, Frontend, Team, FAQ. A right-aligned button "View Documentation" that scrolls to the FAQ/contact section.
+
+2. HERO
+Headline: "NEXUS-Foundry"
+Subheadline: "A Cross-Stage Cognitive Digital Twin Platform for Predictive Casting Intelligence"
+Tagline pill or supporting line: "Predict, Prevent, Preserve — Making Foundry Data Speak."
+One short paragraph (from 01_ARCHITECTURE §1) explaining it connects Melting → Molding → Pouring → Quality into one system that predicts equipment failures 8–24 hours ahead and defects 15+ hours ahead.
+Two buttons: "Explore Architecture" (scrolls to Architecture section) and "View on GitHub" (placeholder href="#").
+Include a simple animated diagram/flow strip of: Physical Foundry → Sensors → Kafka → Digital Twins → AI Models → Dashboard → Operator Action (small icons + arrows, horizontal on desktop, stacked on mobile).
+
+3. THE PROBLEM (3 cards, like the reference's "Strategic Thinking / Business Expertise / Trusted Partnership" row)
+Card 1: "Unexpected Equipment Failures" — furnace linings erode invisibly; failures can cost ₹54 lakhs+.
+Card 2: "Late Defect Discovery" — defects currently found ~15 hours after the causal event.
+Card 3: "Loss of Expert Knowledge" — retiring operators take their intuition with them; this is what the RAG assistant preserves.
+
+4. SEVEN-LAYER ARCHITECTURE (horizontal scrolling card row or numbered stacked list, like the reference's "Our Services" carousel)
+One card per layer, numbered 1–7, each with a short title + one-line responsibility, pulled exactly from 01_ARCHITECTURE §2 table (Physical/Edge, Ingestion, Storage/Data, Digital Twin, AI/Analytics, Intelligence, Application).
+
+5. THE FOUR DIGITAL TWINS (4-card grid, like the reference's values grid)
+One card per twin (Melting, Molding, Pouring, Quality) from 01_ARCHITECTURE §3 — each card shows: twin name, what it represents, its key state variables as small tags/chips, and which models it calls. Quality Twin card should carry a small "In Progress" badge (per status table in §10).
+
+6. SIX AI MODELS (grid or alternating left/right feature rows, like the reference's "Our Values" image+text blocks)
+One block per model (LSTM-AE, TFT, XGBoost+SHAP, ResNet-50+PCA, PINN, RAG) from 01_ARCHITECTURE §4 — purpose, input, output, and its one achieved performance stat (e.g. "99.6% detection rate", "MAE 12.4°C", "F1 0.87", "91.2% accuracy", "<5°C error", "triple-source retrieval").
+
+7. HOW IT WORKS — CROSS-STAGE CORRELATION (numbered vertical timeline/process section, like the reference's "Discover / Strategize / Execute" steps)
+Use the worked example from 01_ARCHITECTURE §5 / 02_WORKFLOW §7 (Melting anomaly at 14:48:02 → warning to Pouring Twin → XGBoost 91% risk → SHAP explanation → operator uses PINN → risk drops to 34% → pour proceeds → Quality inspects). Present as 6–8 short numbered steps with icons.
+
+8. KEY PERFORMANCE METRICS (4–6 stat counters, like the reference's "0+ Businesses Advised" stat row)
+Pull from 02_WORKFLOW_AND_REQUIREMENTS §2: LSTM-AE >95%, TFT MAE <15°C, XGBoost F1 >0.87, cross-stage warning <2s, what-if simulation <3s, RAG response <10s. Animate counting up on scroll into view if feasible.
+
+9. BEFORE / AFTER COMPARISON (two-column comparison, like the reference's "Other Firms vs With Us" section)
+Left column "Reactive Monitoring (Before)": failures discovered after the fact, defects found 15 hours late, tribal knowledge lost on retirement, manual inspection only.
+Right column "NEXUS-Foundry (After)": 8–24 hour failure prediction, 15+ hour early defect warning, RAG-preserved expert knowledge, explainable AI-driven alerts.
+
+10. FRONTEND PREVIEW (feature section referencing 03_FRONTEND.md)
+Short intro: "A real-time operator dashboard built with React, Three.js and live WebSocket data." Then a 3–4 card row summarizing the main app pages: Dashboard (live twin status cards), Twin Pages (3D model + live sensor graph + alerts), Final Analytics (SHAP explainability), Agent (RAG chat + PINN what-if simulator). Keep descriptions to 1–2 lines each, drawn from 03_FRONTEND.md sections 6, 5, 7, 9, 10.
+
+11. TEAM (card row, like the reference's testimonial cards, but as team members not quotes)
+Team Number 16. List: Subiksha MV, C. B Harinie, K. Kanishthika, Pon Gopika P — role "Developer/Researcher". Guide: Dr. Bagavathi Sivakumar P — "Chairperson, Department of CSE" (this is from the PDF cover page context, mention only if the attached files or this prompt supply it — otherwise omit gracefully).
+
+12. FAQ (accordion, like the reference's FAQ section)
+Write 5 short Q&As using facts already in the docs, e.g.: "What is a digital twin in this system?" / "How does the system predict failures before they happen?" / "What makes the RAG assistant different from a normal chatbot?" / "Is any data sent to external AI APIs?" (answer: no — on-premise only per NFR-S1, local Llama 3 via Ollama) / "What happens if a twin service restarts?" (answer: state restored within 30 seconds per NFR-R3).
+
+13. FOOTER / CTA
+Closing headline: "From Reactive Monitoring to Autonomous, Cognitive Intelligence." Small line: "Making foundry data speak — in plain language." Footer columns: Project (Architecture, Workflow, Frontend anchors), Team, and a placeholder GitHub/contact link. Copyright line: "© 2026 NEXUS-Foundry — Team 16."
+
+STRICT CONSTRAINTS
+- Do not fabricate any additional statistics, testimonials, client logos, or pricing — this is a student project, not a company.
+- Do not add a blog section, case-studies section, or "book a consultation" flow from the reference template — skip anything that doesn't map to real content in the 3 files.
+- Keep all copy factually traceable to the attached markdown files.
+- Ship this as one complete, working build — I have very limited credits, so include everything above in this first generation rather than a partial scaffold I'd need to request additions to.

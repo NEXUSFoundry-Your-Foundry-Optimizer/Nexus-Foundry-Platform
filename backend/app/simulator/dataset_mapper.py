@@ -87,4 +87,16 @@ class DatasetMapper:
                 })
         return events
 
+    @staticmethod
+    def map_inspection_row(row: Dict[str, Any], sim_time: str) -> Dict[str, Any]:
+        return {
+            "batch_id": str(row.get("batch_id", "BATCH-DEFAULT")),
+            "image_id": str(row.get("image_id", "UNKNOWN")),
+            "defect_present": str(row.get("defect_present", "False")).lower() == "true",
+            "defect_type": str(row.get("defect_type", "none")),
+            "severity": int(row.get("severity", 0)),
+            "inspection_result": str(row.get("inspection_result", "PASS")),
+            "timestamp": sim_time,
+        }
+
 import pandas as pd

@@ -14,8 +14,9 @@ import { ArrowUpRight, Droplets, Flame, Layers, Scan } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
 import { StatusPill } from "@/components/site/StatusPill";
 import { TFTChart } from "@/components/charts/TFTChart";
-import { ALERTS, BATCHES, HEALTH_HISTORY, TWINS, TWIN_ORDER, TWIN_STATE, type Severity } from "@/lib/nexus-data";
+import { TWINS, TWIN_ORDER, type Severity } from "@/lib/nexus-data";
 import { cn } from "@/lib/utils";
+import { useLiveCollection, useLiveDashboard, useLiveTwin, type LiveAlert, type LiveBatch } from "@/lib/live-api";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -34,12 +35,21 @@ export const Route = createFileRoute("/dashboard")({
 
 const icons = { flame: Flame, layers: Layers, droplets: Droplets, scan: Scan } as const;
 
-const headline: Record<string, string> = {
-  melting: "1479°C",
-  molding: "4.2%",
-  pouring: "91% risk",
-  quality: "0.29",
-};
+function headline(id: keyof typeof TWINS, state: Record<string, unknown> | undefined) {
+  if (!state) return "Loading...";
+  if (id === "melting") return `${Number(state["melt_temp"] ?? 0).toFixed(2)}°C`;
+  if (id === "molding") return `${Number(state["sand_moisture"] ?? 0).toFixed(2)}%`;
+  if (id === "pouring") return `${Number(state["pre_pour_risk"] ?? state["upstream_risk"] ?? 0).toFixed(2)}% risk`;
+  return `${Number(state["defect_risk"] ?? 0).toFixed(2)}`;
+}
+
+function statusFor(id: keyof typeof TWINS, state: Record<string, unknown> | undefined): Severity {
+  if (!state) return "warning";
+  if (id === "melting") return Number(state["anomaly_score"] ?? 0) > 0.78 ? "critical" : "normal";
+  if (id === "pouring") return Number(state["pre_pour_risk"] ?? 0) > 0.5 ? "critical" : "normal";
+  if (id === "quality") return Number(state["defect_risk"] ?? 0) > 0.5 ? "critical" : "warning";
+  return Number(state["sand_moisture"] ?? 0) > 5 ? "warning" : "normal";
+}
 
 const barColor: Record<Severity, string> = {
   critical: "bg-destructive",
@@ -55,6 +65,10 @@ const chartTooltip = {
 };
 
 function Dashboard() {
+  const { data: liveData, error: liveError } = useLiveDashboard();
+  const { history } = useLiveTwin("melting");
+  const { data: batches } = useLiveCollection<LiveBatch[]>("/api/batches");
+  const { data: alerts } = useLiveCollection<LiveAlert[]>("/api/v1/alerts/active");
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
       <Reveal>
@@ -64,6 +78,7 @@ function Dashboard() {
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="size-1.5 rounded-full bg-primary pulse-dot" /> WebSocket /ws · 2s refresh
           </span>
+          {liveError && <p className="w-full text-xs text-warning">{liveError}</p>}
         </div>
       </Reveal>
 
@@ -71,7 +86,8 @@ function Dashboard() {
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {TWIN_ORDER.map((id, i) => {
           const t = TWINS[id];
-          const s = TWIN_STATE[id];
+          const state = liveData?.twins[id];
+          const status = statusFor(id, state);
           const Icon = icons[t.icon as keyof typeof icons];
           return (
             <Reveal key={id} delay={i * 0.06}>
@@ -87,9 +103,9 @@ function Dashboard() {
                   <ArrowUpRight className="size-4 text-muted-foreground transition-colors group-hover:text-primary" />
                 </div>
                 <p className="mt-4 text-sm text-muted-foreground">{t.name}</p>
-                <p className="mt-1 font-mono text-2xl">{headline[id]}</p>
+                <p className="mt-1 font-mono text-2xl">{headline(id, state)}</p>
                 <div className="mt-4">
-                  <StatusPill status={s.status} />
+                  <StatusPill status={status} />
                 </div>
               </Link>
             </Reveal>
@@ -103,7 +119,7 @@ function Dashboard() {
           <h2 className="text-sm font-medium">Batch Timeline</h2>
           <p className="mt-1 text-xs text-muted-foreground">Today · colour-coded by predicted defect outcome</p>
           <div className="mt-6 flex gap-1.5 overflow-x-auto pb-2">
-            {BATCHES.map((b) => (
+            {(batches ?? []).map((b) => (
               <div key={b.id} className="min-w-[150px] flex-1">
                 <div className={cn("h-2 rounded-full", barColor[b.status])} />
                 <p className="mt-3 font-mono text-sm">{b.id}</p>
@@ -112,8 +128,8 @@ function Dashboard() {
                 </p>
                 <p className="mt-1 text-xs">
                   <span className="text-muted-foreground">risk </span>
-                  <span className={cn(b.predicted > 0.5 ? "text-destructive" : b.predicted > 0.2 ? "text-warning" : "text-success")}>
-                    {(b.predicted * 100).toFixed(0)}%
+                  <span className={cn((b.predicted ?? 0) > 0.5 ? "text-destructive" : (b.predicted ?? 0) > 0.2 ? "text-warning" : "text-success")}>
+                    {b.predicted == null ? "--" : `${(b.predicted * 100).toFixed(2)}%`}
                   </span>
                 </p>
               </div>
@@ -140,9 +156,9 @@ function Dashboard() {
             <p className="mt-1 text-xs text-muted-foreground">30-day rolling average, °C</p>
             <div className="mt-4 h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={HEALTH_HISTORY} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                <LineChart data={history} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="d" tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} minTickGap={24} />
+                  <XAxis dataKey="t" tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} minTickGap={24} />
                   <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={chartTooltip} />
                   <Line type="monotone" dataKey="temp" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
@@ -158,12 +174,12 @@ function Dashboard() {
             <p className="mt-1 text-xs text-muted-foreground">Percent of castings rejected per day</p>
             <div className="mt-4 h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={HEALTH_HISTORY} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                <BarChart data={history} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="d" tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} minTickGap={24} />
+                  <XAxis dataKey="t" tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} minTickGap={24} />
                   <YAxis tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={chartTooltip} cursor={{ fill: "var(--color-muted)", opacity: 0.3 }} />
-                  <Bar dataKey="defectRate" fill="var(--color-chart-3)" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="vibration" fill="var(--color-chart-3)" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -175,7 +191,7 @@ function Dashboard() {
             <h2 className="text-sm font-medium">Active Alerts</h2>
             <p className="mt-1 text-xs text-muted-foreground">Live from /api/alerts/active</p>
             <div className="mt-4 space-y-2">
-              {ALERTS.filter((a) => a.severity !== "normal").map((a) => (
+              {(alerts ?? []).filter((a) => a.severity !== "normal").map((a) => (
                 <Link
                   key={a.id}
                   to="/twins/$twin"

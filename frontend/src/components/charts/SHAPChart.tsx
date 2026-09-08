@@ -1,12 +1,14 @@
-import { SHAP } from "@/lib/nexus-data";
+import { useLiveCollection } from "@/lib/live-api";
 import { cn } from "@/lib/utils";
 
 /** FR-06: SHAP explainability for the XGBoost defect prediction. */
 export function SHAPChart() {
-  const max = Math.max(...SHAP.features.map((f) => Math.abs(f.value)));
+  const { data } = useLiveCollection<{ features: { name: string; value: number }[] }>("/api/analytics/shap", 10000);
+  const features = data?.features ?? [];
+  const max = Math.max(...features.map((f) => Math.abs(f.value)), 1);
   return (
     <div className="space-y-3">
-      {SHAP.features.map((f) => {
+      {features.map((f) => {
         const pct = (Math.abs(f.value) / max) * 50;
         const positive = f.value >= 0;
         return (
@@ -24,7 +26,7 @@ export function SHAPChart() {
             </div>
             <span className={cn("text-right font-mono text-xs", positive ? "text-destructive" : "text-primary")}>
               {positive ? "+" : ""}
-              {(f.value * 100).toFixed(0)}%
+              {(f.value * 100).toFixed(2)}%
             </span>
           </div>
         );

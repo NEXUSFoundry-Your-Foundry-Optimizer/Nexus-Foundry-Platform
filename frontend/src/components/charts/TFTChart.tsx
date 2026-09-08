@@ -1,10 +1,12 @@
 import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { FORECAST } from "@/lib/nexus-data";
+import { useLiveCollection } from "@/lib/live-api";
 
-const band = FORECAST.map((d) => ({ ...d, range: [d.p10, d.p90] as [number, number] }));
+interface ForecastResponse { forecasts: { timestamp: string; p10: number; p50: number; p90: number }[] }
 
 /** FR-04: 48-hour degradation forecast with P10 / P50 / P90 quantile bands. */
 export function TFTChart() {
+  const { data } = useLiveCollection<ForecastResponse>("/api/v1/predictions/tft?horizon=24", 10000);
+  const band = (data?.forecasts ?? []).map((point) => ({ ...point, h: new Date(point.timestamp).toLocaleTimeString("en-GB", { hour12: false }).slice(0, 5), range: [point.p10, point.p90] as [number, number] }));
   return (
     <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">

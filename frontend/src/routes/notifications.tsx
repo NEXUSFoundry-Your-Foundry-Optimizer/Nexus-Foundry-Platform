@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useNexus } from "@/store/nexus";
+import { useState } from "react";
+import { useLiveCollection, type LiveAlert } from "@/lib/live-api";
 import { Bell, Check, CheckCircle2, AlertTriangle, AlertOctagon, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Severity } from "@/lib/nexus-data";
@@ -15,7 +16,11 @@ const severityConfig: Record<Severity, { icon: React.FC<any>; color: string; bg:
 };
 
 function NotificationsPage() {
-  const { alerts, readIds, markAllRead, markRead } = useNexus();
+  const { data: liveAlerts } = useLiveCollection<LiveAlert[]>("/api/v1/alerts/active");
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const alerts = liveAlerts ?? [];
+  const markAllRead = () => setReadIds(alerts.map((alert) => alert.id));
+  const markRead = (id: string) => setReadIds((current) => current.includes(id) ? current : [...current, id]);
 
   const sortedAlerts = [...alerts].sort((a, b) => b.time.localeCompare(a.time));
 

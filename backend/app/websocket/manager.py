@@ -1,5 +1,6 @@
 import json
 import logging
+from collections import defaultdict, deque
 from typing import List, Dict, Any
 from fastapi import WebSocket
 
@@ -9,6 +10,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self.batch_connections: Dict[str, List[WebSocket]] = {}
+        self.twin_history: Dict[str, deque[Dict[str, Any]]] = defaultdict(lambda: deque(maxlen=60))
 
     async def connect(self, websocket: WebSocket, batch_id: str = "all"):
         await websocket.accept()
@@ -25,9 +27,11 @@ class ConnectionManager:
             self.batch_connections[batch_id].remove(websocket)
         logger.info(f"WebSocket disconnected from batch {batch_id}")
 
-    async def broadcast_digital_twin_update(self, batch_id: str, state: Dict[str, Any]):
+    async def broadcast_digital_twin_update(self, batch_id: str, state: Dict[str, Any], twin: str = "unknown"):
+        self.twin_history[twin].append({"batch_id": batch_id, **state})
         payload = {
             "type": "digital_twin_update",
+            "twin": twin,
             "batch_id": batch_id,
             "timestamp": state.get("updated_at"),
             "state": state
@@ -40,5 +44,8 @@ class ConnectionManager:
                 await connection.send_text(json_data)
             except Exception as e:
                 logger.error(f"Error sending WebSocket broadcast: {e}")
+
+    def get_twin_history(self, twin: str) -> List[Dict[str, Any]]:
+        return list(self.twin_history.get(twin, ()))
 
 ws_manager = ConnectionManager()

@@ -1,4 +1,5 @@
 import json
+import asyncio
 import logging
 from typing import Optional, Any, Callable
 import redis.asyncio as redis
@@ -17,9 +18,11 @@ class RedisManager:
             self.redis = redis.Redis(
                 host=settings.REDIS_HOST,
                 port=settings.REDIS_PORT,
-                decode_responses=True
+                decode_responses=True,
+                socket_connect_timeout=1.0,
+                socket_timeout=1.0
             )
-            await self.redis.ping()
+            await asyncio.wait_for(self.redis.ping(), timeout=1.0)
             self.connected = True
             logger.info(f"Connected to Redis at {settings.REDIS_HOST}:{settings.REDIS_PORT}")
         except Exception as e:

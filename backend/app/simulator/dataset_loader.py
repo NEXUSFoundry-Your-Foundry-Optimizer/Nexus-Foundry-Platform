@@ -27,6 +27,20 @@ class DatasetLoader:
             raise FileNotFoundError(f"NPY dataset file {filename} not found at {file_path}")
         return np.load(file_path)
 
+    def iter_rows(self, filename: str, batch_id: Optional[str] = None):
+        """Stream CSV rows so large sensor replays do not require a full in-memory frame."""
+        file_path = os.path.join(self.dataset_dir, filename)
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Dataset file {filename} not found at {file_path}")
+        for chunk in pd.read_csv(file_path, chunksize=4096):
+            if batch_id and "batch_id" in chunk.columns:
+                chunk = chunk[chunk["batch_id"] == batch_id]
+            for row in chunk.to_dict(orient="records"):
+                yield row
+
+    def count_rows(self, filename: str, batch_id: Optional[str] = None) -> int:
+        return sum(1 for _ in self.iter_rows(filename, batch_id=batch_id))
+
     def list_datasets(self) -> Dict[str, Any]:
         if not os.path.exists(self.dataset_dir):
             return {"error": "Datasets directory missing", "files": []}

@@ -30,6 +30,7 @@ export const TWINS: Record<TwinId, TwinMeta> = {
       { key: "power_kw", label: "Power", unit: "kW" },
       { key: "vibration_g", label: "Vibration", unit: "g" },
       { key: "lining_health", label: "Lining Health", unit: "" },
+      { key: "anomaly_score", label: "Anomaly Score", unit: "" },
       { key: "operating_state", label: "State", unit: "" },
     ],
     series: [
@@ -66,7 +67,7 @@ export const TWINS: Record<TwinId, TwinMeta> = {
       { key: "pour_temp", label: "Pour Temp", unit: "°C" },
       { key: "pour_speed", label: "Pour Speed", unit: "m/s" },
       { key: "ladle_fill_pct", label: "Ladle Fill", unit: "%" },
-      { key: "upstream_risk", label: "Upstream Risk", unit: "%" },
+      { key: "pre_pour_risk", label: "Defect Risk", unit: "%" },
     ],
     series: [
       { key: "temp", label: "Pour Temp (°C)", color: "var(--color-chart-1)" },

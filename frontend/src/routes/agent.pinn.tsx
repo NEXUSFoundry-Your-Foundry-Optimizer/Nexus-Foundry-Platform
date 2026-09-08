@@ -3,26 +3,49 @@ import { Zap, Flame, Mountain, Droplets, CheckCircle2, Save, Play } from "lucide
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { postJson, useLiveTwin } from "@/lib/live-api";
 
 export const Route = createFileRoute("/agent/pinn")({
   component: PINNPage,
 });
 
+type WhatIfResult = {
+  error?: string;
+  risk?: number;
+  previous_risk?: number;
+  physics_valid?: boolean;
+  cooling_rate?: number;
+  recommendation?: string;
+  new_predicted_state?: { pour_temp?: number };
+};
+
 function PINNPage() {
   const [running, setRunning] = useState<"melting" | "molding" | "pouring" | null>(null);
-  const [results, setResults] = useState<boolean>(false);
+  const [results, setResults] = useState<WhatIfResult | null>(null);
+  const { state: melting } = useLiveTwin("melting");
+  const { state: molding } = useLiveTwin("molding");
+  const { state: pouring } = useLiveTwin("pouring");
   
   const [setpoint, setSetpoint] = useState("1400");
   const [moisture, setMoisture] = useState("3.5");
   const [speed, setSpeed] = useState("0.68");
 
-  const runSimulation = (type: "melting" | "molding" | "pouring") => {
+  const runSimulation = async (type: "melting" | "molding" | "pouring") => {
     setRunning(type);
-    setResults(false);
-    setTimeout(() => {
+    setResults(null);
+    try {
+      const parameters = type === "melting"
+        ? { pour_temp: Number(setpoint) }
+        : type === "molding"
+          ? { sand_moisture: Number(moisture) }
+          : { pour_speed: Number(speed) };
+      const result = await postJson<WhatIfResult>("/api/v1/simulation/what-if", { twin: type, parameters });
+      setResults(result);
+    } catch (error) {
+      setResults({ error: error instanceof Error ? error.message : "Simulation failed" });
+    } finally {
       setRunning(null);
-      setResults(true);
-    }, 2000);
+    }
   };
 
   return (
@@ -52,7 +75,7 @@ function PINNPage() {
               <div className="mb-3 space-y-2 text-sm text-muted-foreground">
                 <div className="flex justify-between">
                   <span>Current Temperature:</span>
-                  <span className="font-mono text-foreground">1479°C</span>
+                  <span className="font-mono text-foreground">{melting ? `${Number(melting["melt_temp"] ?? 0).toFixed(2)}°C` : "--"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Proposed Setpoint:</span>
@@ -86,7 +109,7 @@ function PINNPage() {
               <div className="mb-3 space-y-2 text-sm text-muted-foreground">
                 <div className="flex justify-between">
                   <span>Current Moisture:</span>
-                  <span className="font-mono text-foreground">4.2%</span>
+                  <span className="font-mono text-foreground">{molding ? `${Number(molding["sand_moisture"] ?? 0).toFixed(2)}%` : "--"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Proposed Moisture:</span>
@@ -120,7 +143,7 @@ function PINNPage() {
               <div className="mb-3 space-y-2 text-sm text-muted-foreground">
                 <div className="flex justify-between">
                   <span>Current Speed:</span>
-                  <span className="font-mono text-foreground">0.74 m/s</span>
+                  <span className="font-mono text-foreground">{pouring ? `${Number(pouring["pour_speed"] ?? 0).toFixed(2)} m/s` : "--"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Proposed Speed:</span>
@@ -154,15 +177,16 @@ function PINNPage() {
             <h2 className="mb-4 text-lg font-semibold">Simulation Results</h2>
             {results ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                {results.error ? <p className="text-sm text-destructive">{results.error}</p> : <>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg bg-background p-4">
                     <div className="text-sm text-muted-foreground">New Pour Temperature</div>
-                    <div className="mt-1 font-mono text-xl font-medium">1391°C</div>
+                    <div className="mt-1 font-mono text-xl font-medium">{results.new_predicted_state?.pour_temp?.toFixed(2) ?? "--"}°C</div>
                   </div>
                   <div className="rounded-lg bg-background p-4">
                     <div className="text-sm text-muted-foreground">New Defect Risk</div>
                     <div className="mt-1 flex items-center gap-2 font-mono text-xl font-medium text-green-500">
-                      34% <span className="text-sm text-muted-foreground">(↓ from 91%)</span>
+                      {((results.risk ?? 0) * 100).toFixed(2)}% <span className="text-sm text-muted-foreground">(from {((results.previous_risk ?? 0) * 100).toFixed(2)}%)</span>
                     </div>
                   </div>
                 </div>
@@ -170,14 +194,14 @@ function PINNPage() {
                 <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-primary">
                   <CheckCircle2 className="size-5" />
                   <div>
-                    <span className="font-semibold">Physics Valid: Yes</span>
-                    <span className="ml-2 text-primary/80">(cooling rate 1.83°C/min respects heat equation constraints)</span>
+                    <span className="font-semibold">Physics Valid: {results.physics_valid ? "Yes" : "No"}</span>
+                    <span className="ml-2 text-primary/80">(cooling rate {results.cooling_rate ?? "--"}°C/sec)</span>
                   </div>
                 </div>
 
                 <div className="rounded-lg bg-secondary/50 p-4 text-sm">
-                  <span className="font-semibold">Recommendation:</span> Reduce pour speed to 0.68 m/s to align with new setpoint.
-                </div>
+                  <span className="font-semibold">Recommendation:</span> {results.recommendation}
+                </div></>}
 
                 <div className="flex gap-3 pt-2">
                   <button className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90">

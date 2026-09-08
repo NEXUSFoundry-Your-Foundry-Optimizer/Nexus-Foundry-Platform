@@ -23,13 +23,18 @@ class QualityTwin(BaseDigitalTwin):
         self.current_state["batch_id"] = batch_id
         
         if "defect_present" in event:
-            self.current_state["defect_present"] = bool(event["defect_present"])
+            value = event["defect_present"]
+            self.current_state["defect_present"] = value if isinstance(value, bool) else str(value).lower() == "true"
         if "defect_type" in event:
             self.current_state["defect_type"] = str(event["defect_type"])
         if "inspection_result" in event:
             self.current_state["inspection_result"] = str(event["inspection_result"])
         if "defect_risk" in event:
             self.current_state["defect_risk"] = float(event["defect_risk"])
+        if "severity" in event:
+            self.current_state["severity"] = int(event["severity"])
+        if "image_id" in event:
+            self.current_state["image_id"] = str(event["image_id"])
             
         self.current_state["updated_at"] = datetime.now().isoformat()
         

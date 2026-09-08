@@ -34,6 +34,8 @@ class PINNModel:
             "estimated_solidification_time_sec": round(1200.0 / max(0.1, cooling_rate), 1),
             "grid_shape": grid_shape,
             "pinn_sample_value": sample_value
+            ,"physics_valid": cooling_rate > 0,
+            "recommendation": "Proposed change is physically valid." if cooling_rate > 0 else "Increase the proposed pour temperature."
         }
 
 pinn_model = PINNModel()

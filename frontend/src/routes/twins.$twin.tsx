@@ -5,8 +5,9 @@ import { TwinVisual } from "@/components/three/TwinVisual";
 import type { SceneVariant } from "@/components/three/scene";
 import { Reveal } from "@/components/site/Reveal";
 import { StatusPill } from "@/components/site/StatusPill";
-import { ALERTS, TWINS, TWIN_ORDER, TWIN_STATE, type TwinId } from "@/lib/nexus-data";
+import { TWINS, TWIN_ORDER, type TwinId } from "@/lib/nexus-data";
 import { useNexus } from "@/store/nexus";
+import { formatLiveValue, useLiveCollection, useLiveTwin, type LiveAlert } from "@/lib/live-api";
 import { cn } from "@/lib/utils";
 
 const variants: Record<TwinId, SceneVariant> = {
@@ -45,9 +46,20 @@ export const Route = createFileRoute("/twins/$twin")({
 function TwinPage() {
   const { twin } = Route.useLoaderData();
   const meta = TWINS[twin];
-  const state = TWIN_STATE[twin];
+  const { state: liveState, error } = useLiveTwin(twin);
+  const { data: liveAlerts } = useLiveCollection<LiveAlert[]>(`/api/v1/alerts?twin=${twin}`);
+  const values = liveState
+    ? meta.fields.map((field) => ({ label: field.label, unit: field.unit, value: formatLiveValue(field.key, liveState[field.key]) }))
+    : meta.fields.map((field) => ({ label: field.label, unit: field.unit, value: "--" }));
+  const liveStatus = twin === "melting"
+    ? Number(liveState?.["anomaly_score"] ?? 0) > 0.78 ? "critical" : "normal"
+    : twin === "pouring"
+      ? Number(liveState?.["pre_pour_risk"] ?? 0) > 0.7 ? "critical" : "normal"
+      : twin === "quality"
+        ? Number(liveState?.["defect_risk"] ?? 0) > 0.5 ? "critical" : "warning"
+        : Number(liveState?.["sand_moisture"] ?? 0) > 5 ? "warning" : "normal";
   const focused = useNexus((s) => s.focusedAlert);
-  const alerts = ALERTS.filter((a) => a.twin === twin);
+  const alerts = liveAlerts ?? [];
   const idx = TWIN_ORDER.indexOf(twin);
   const prev = TWIN_ORDER[(idx + 3) % 4]!;
   const next = TWIN_ORDER[(idx + 1) % 4]!;
@@ -62,13 +74,14 @@ function TwinPage() {
             <p className="mt-3 max-w-xl text-muted-foreground">{meta.blurb}</p>
           </div>
           <div className="flex flex-col items-start gap-3 sm:items-end">
-            <StatusPill status={state.status} />
+            <StatusPill status={liveState ? liveStatus : "warning"} />
             {meta.comingSoon && (
               <span className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs text-warning">
                 Backend integration in progress
               </span>
             )}
-            <p className="font-mono text-xs text-muted-foreground">Batch {state.batch} · live via /ws every 2s</p>
+            <p className="font-mono text-xs text-muted-foreground">Batch {String(liveState?.batch_id ?? "Waiting for telemetry")} · live via /ws every 2s</p>
+            {error && <p className="text-xs text-warning">{error}</p>}
           </div>
         </div>
       </Reveal>
@@ -96,7 +109,7 @@ function TwinPage() {
         <div className="surface-panel p-5">
           <h2 className="text-sm font-medium">Data Info</h2>
           <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 lg:grid-cols-6">
-            {state.values.map((v) => (
+            {values.map((v) => (
               <div key={v.label} className="bg-surface px-4 py-4">
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{v.label}</p>
                 <p className="mt-1.5 font-mono text-xl">
@@ -111,7 +124,7 @@ function TwinPage() {
 
       <Reveal delay={0.12} className="mt-5">
         <div className="surface-panel p-5">
-          <h2 className="text-sm font-medium">Alert Logs</h2>
+          <h2 className="text-sm font-medium">Alert Logs · Recorded Events</h2>
           <div className="mt-4 space-y-2">
             {alerts.length === 0 && <p className="text-sm text-muted-foreground">No alerts recorded for this twin today.</p>}
             {alerts.map((a) => (

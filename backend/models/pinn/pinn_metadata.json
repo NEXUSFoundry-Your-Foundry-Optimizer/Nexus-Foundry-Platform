@@ -1,0 +1,12 @@
+{
+  "input_dim": 4,
+  "output_dim": 5000,
+  "hidden_dim": 64,
+  "best_val_loss": 1.00001955793259,
+  "test_mse": 1.000252366065979,
+  "test_mae": 0.79793381690979,
+  "total_epochs": 100,
+  "train_samples": 14000,
+  "val_samples": 3000,
+  "test_samples": 3000
+}

@@ -3,7 +3,8 @@ import { ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
 import { StatusPill } from "@/components/site/StatusPill";
 import { SHAPChart } from "@/components/charts/SHAPChart";
-import { ALERTS, BATCHES, SHAP, TWINS } from "@/lib/nexus-data";
+import { TWINS } from "@/lib/nexus-data";
+import { useLiveCollection, type LiveAlert, type LiveBatch } from "@/lib/live-api";
 import { useNexus } from "@/store/nexus";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,9 @@ export const Route = createFileRoute("/analytics")({
 function Analytics() {
   const navigate = useNavigate();
   const focusAlert = useNexus((s) => s.focusAlert);
+  const { data: alerts } = useLiveCollection<LiveAlert[]>("/api/v1/alerts/active");
+  const { data: batches } = useLiveCollection<LiveBatch[]>("/api/batches");
+  const { data: shap } = useLiveCollection<{ prediction: string; probability: number; recommendation: string }>("/api/analytics/shap", 10000);
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
@@ -55,7 +59,7 @@ function Analytics() {
                 </tr>
               </thead>
               <tbody>
-                {ALERTS.map((a) => (
+                {(alerts ?? []).map((a) => (
                   <tr key={a.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/40">
                     <td className="px-6 py-4">{TWINS[a.twin].name}</td>
                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{a.batch}</td>
@@ -93,7 +97,7 @@ function Analytics() {
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Defect prediction</p>
               <p className="font-mono text-xl text-warning">
-                {SHAP.prediction} ({(SHAP.probability * 100).toFixed(0)}%)
+                {shap?.prediction ?? "Loading..."} {shap && `(${(shap.probability * 100).toFixed(2)}%)`}
               </p>
             </div>
           </div>
@@ -103,7 +107,7 @@ function Analytics() {
           </div>
           <p className="mt-4 rounded-lg border border-primary/30 bg-primary/8 px-4 py-3 text-sm">
             <span className="font-medium text-primary">Recommendation: </span>
-            {SHAP.recommendation}
+            {shap?.recommendation ?? "Waiting for live model output."}
           </p>
         </div>
       </Reveal>
@@ -114,19 +118,19 @@ function Analytics() {
           <h2 className="text-sm font-medium">Defect Prediction vs. Inspection</h2>
           <p className="mt-1 text-xs text-muted-foreground">Pre-pour XGBoost probability compared with post-inspection outcome</p>
           <div className="mt-6 space-y-3">
-            {BATCHES.map((b) => (
+            {(batches ?? []).map((b) => (
               <div key={b.id} className="grid grid-cols-[80px_1fr_92px_88px] items-center gap-4">
                 <span className="font-mono text-sm">{b.id}</span>
                 <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                   <div
                     className={cn(
                       "h-full rounded-full transition-all duration-1000",
-                      b.predicted > 0.5 ? "bg-destructive" : b.predicted > 0.2 ? "bg-warning" : "bg-success",
+                      (b.predicted ?? 0) > 0.5 ? "bg-destructive" : (b.predicted ?? 0) > 0.2 ? "bg-warning" : "bg-success",
                     )}
-                    style={{ width: `${b.predicted * 100}%` }}
+                    style={{ width: `${(b.predicted ?? 0) * 100}%` }}
                   />
                 </div>
-                <span className="font-mono text-xs text-muted-foreground">{(b.predicted * 100).toFixed(0)}% pred.</span>
+                <span className="font-mono text-xs text-muted-foreground">{b.predicted == null ? "--" : `${(b.predicted * 100).toFixed(2)}% pred.`}</span>
                 <span
                   className={cn(
                     "rounded border px-2 py-1 text-center text-[11px]",

@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -9,27 +8,19 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { buildSeries, TWINS, type TwinId, type SensorPoint } from "@/lib/nexus-data";
+import { useLiveTwin } from "@/lib/live-api";
+import { TWINS, type TwinId } from "@/lib/nexus-data";
 
-/** Simulates the /ws feed: pushes a fresh sample every 2 seconds (FR-12). */
 export function LiveSensorChart({ twin }: { twin: TwinId }) {
   const meta = TWINS[twin];
-  const [data, setData] = useState<SensorPoint[]>(() => buildSeries(twin));
-
-  useEffect(() => {
-    setData(buildSeries(twin));
-    let i = 40;
-    const id = setInterval(() => {
-      i += 1;
-      setData((prev) => [...prev.slice(1), ...buildSeries(twin, 1, i)]);
-    }, 2000);
-    return () => clearInterval(id);
-  }, [twin]);
+  const { history, error } = useLiveTwin(twin);
 
   return (
     <div className="h-[300px] w-full">
+      {error && <p className="mb-2 text-xs text-warning">{error}</p>}
+      {history.length === 0 && !error && <p className="mb-2 text-xs text-muted-foreground">Waiting for live telemetry...</p>}
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+      <AreaChart data={history} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
           <defs>
             {meta.series.map((s, i) => (
               <linearGradient key={s.key} id={`g-${twin}-${i}`} x1="0" y1="0" x2="0" y2="1">

@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Bell, ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNexus } from "@/store/nexus";
+import { useLiveCollection, type LiveAlert } from "@/lib/live-api";
 import { cn } from "@/lib/utils";
 
 const twinLinks = [
@@ -55,8 +56,8 @@ function Dropdown({
 }
 
 export function Navbar() {
-  const { alerts, readIds } = useNexus();
-  const unread = alerts.filter((a) => !readIds.includes(a.id)).length;
+  const { data: alerts } = useLiveCollection<LiveAlert[]>("/api/v1/alerts/active");
+  const unread = alerts?.length ?? 0;
   const [scrolled, setScrolled] = useState(false);
   const [mobile, setMobile] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });

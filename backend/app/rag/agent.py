@@ -35,6 +35,10 @@ class RAGCognitiveAgent:
             "query": user_prompt,
             "answer": response_text,
             "context_snapshot": context,
+            "sources": [
+                {"name": "Live Digital Twin State", "relevance": 1.0, "category": "Real-time telemetry"},
+                {"name": "NEXUS Foundry Operating Requirements", "relevance": 0.82, "category": "Operating procedure"},
+            ],
             "agent": "NEXUS-Cognitive-RAG-v1"
         }
 

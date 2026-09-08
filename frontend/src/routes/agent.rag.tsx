@@ -32,6 +32,7 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { postJson } from "@/lib/live-api";
 
 export const Route = createFileRoute("/agent/rag")({
   component: RAGPage,
@@ -236,8 +237,14 @@ const quickPromptSuggestions = [
 ];
 
 function RAGPage() {
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
-  const [activeConvId, setActiveConvId] = useState<string>(initialConversations[0].id);
+  const [conversations, setConversations] = useState<Conversation[]>([{
+    id: "live-session",
+    title: "Live Foundry Session",
+    updatedAt: "Now",
+    context: { furnace: "Live furnace", batch: "Live batch", status: "normal" },
+    messages: [],
+  }]);
+  const [activeConvId, setActiveConvId] = useState<string>("live-session");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -286,8 +293,7 @@ function RAGPage() {
     }
   }, [conversations]);
 
-  const currentConversation =
-    conversations.find((c) => c.id === activeConvId) || conversations[0];
+  const currentConversation = conversations.find((c) => c.id === activeConvId) || conversations[0]!;
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -322,7 +328,7 @@ function RAGPage() {
     const updated = conversations.filter((c) => c.id !== convId);
     setConversations(updated);
     if (activeConvId === convId) {
-      setActiveConvId(updated[0].id);
+      setActiveConvId(updated[0]!.id);
     }
   };
 
@@ -434,7 +440,7 @@ function RAGPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleSend = (e?: React.FormEvent, directPrompt?: string) => {
+  const handleSend = async (e?: React.FormEvent, directPrompt?: string) => {
     if (e) e.preventDefault();
     const queryToSend = directPrompt !== undefined ? directPrompt : input;
     if (!queryToSend.trim() && !attachedImage) return;
@@ -444,12 +450,11 @@ function RAGPage() {
       id: Date.now().toString(),
       role: "user",
       content: userText || "Analyzed attached thermal inspection image for structural defects.",
-      imageUrl: attachedImage ? attachedImage.url : undefined,
-      imageName: attachedImage ? attachedImage.name : undefined,
       timestamp: new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      ...(attachedImage ? { imageUrl: attachedImage.url, imageName: attachedImage.name } : {}),
     };
 
     setConversations((prev) =>
@@ -469,64 +474,27 @@ function RAGPage() {
       })
     );
 
-    const hasImage = Boolean(attachedImage);
     setInput("");
     setAttachedImage(null);
     setIsTyping(true);
-
-    setTimeout(() => {
-      setIsTyping(false);
-
+    try {
+      const response = await postJson<{ answer: string; sources?: Source[] }>("/api/v1/chat", {
+        message: userMsg.content,
+        batch_id: currentConversation?.context.batch ?? "latest",
+      });
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: hasImage
-          ? `Vision Inspection & Live Twin Telemetry Analysis:\n\n• Anomaly Detection: The attached thermographic image demonstrates localized heat concentration along Zone B partition (peak core: 1,614.8°C).\n• Thickness Degradation: Correlating with ultrasonic baseline records, refractory lining has diminished from 85mm to 38mm.\n• Safety Threshold: ASTM E1934 limit breached. Automated safety protocol recommends reducing induction power by 15% and scheduling crucible reline prior to melt batch ${currentConversation.context.batch}-02.`
-          : `Grounded Diagnosis for ${currentConversation.context.furnace}:\n\n• Cross-referencing telemetry stream with historical incident logs confirms operating parameters are trending towards refractory lining degradation.\n• Coil grout vibration frequency indicates thermal micro-fissures.\n• Recommended Action: Execute borescope camera sweep during next slagging cycle.`,
-        sources: [
-          {
-            name: "Live Telemetry InfluxDB",
-            relevance: 98,
-            docId: "STREAM-INFLUX-F3",
-            category: "Real-time Telemetry Stream",
-            excerpt:
-              "Sensor Stream telemetry: Zone B thermocouple recorded 1,614.8°C at holding peak. Thermal variance threshold exceeded by 38°C.",
-          },
-          {
-            name: "Refractory Maintenance SOP v3.2",
-            relevance: 92,
-            docId: "SOP-REL-F3",
-            category: "Maintenance Standard",
-            excerpt:
-              "Crucible Shell Protection Protocol: Refractory thickness under 40mm necessitates scheduled furnace ramp-down to avoid steel coil penetration.",
-          },
-          {
-            name: "Thermal Imaging Standards ASTM E1934",
-            relevance: 87,
-            docId: "ASTM-E1934-2023",
-            category: "Industry Standard",
-            excerpt:
-              "Standard guide for examining electrical and mechanical equipment with infrared thermography in metallurgical melting vessels.",
-          },
-        ],
-        retrievalSteps: [
-          "Retrieved real-time InfluxDB telemetry and coil vibration logs",
-          "Calculated thermal degradation delta against SOP v3.2 limits",
-          "Verified containment standards against ASTM E1934 protocol",
-          "Grounded synthesis generated via Llama-3-70B Foundry model",
-        ],
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        content: response.answer,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        ...(response.sources ? { sources: response.sources } : {}),
       };
-
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === activeConvId ? { ...c, messages: [...c.messages, botMsg] } : c
-        )
-      );
-    }, 1300);
+      setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, botMsg] } : c));
+    } catch (error) {
+      setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, { id: String(Date.now() + 1), role: "assistant", content: error instanceof Error ? error.message : "RAG request failed", timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }] } : c));
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (

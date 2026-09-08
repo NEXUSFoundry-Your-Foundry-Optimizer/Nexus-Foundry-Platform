@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { ALERTS, type AlertRow, type TwinId } from "@/lib/nexus-data";
+import type { AlertRow } from "@/lib/nexus-data";
+import type { TwinId } from "@/lib/nexus-data";
 
 interface NexusState {
   user: { name: string; role: string; shift: string; plant: string };
@@ -28,7 +29,7 @@ export const useNexus = create<NexusState>((set) => ({
   user: { name: "Arjun Mehta", role: "Senior Melt Operator", shift: "B — 14:00 to 22:00", plant: "Foundry Unit 2, Pune" },
   activeBatch: "AL-CB-001",
   activeFurnace: "Furnace 3",
-  alerts: ALERTS,
+  alerts: [],
   readIds: [],
   focusedAlert: null,
   markAllRead: () => set((s) => ({ readIds: s.alerts.map((a) => a.id) })),

@@ -12,6 +12,6 @@ class BaseDigitalTwin(ABC):
         pass
 
     @abstractmethod
-    def get_state((self)) -> Dict[str, Any]:
+    def get_state(self) -> Dict[str, Any]:
         """Returns the current state dictionary of the digital twin."""
         return self.current_state

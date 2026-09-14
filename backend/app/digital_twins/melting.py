@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from collections import deque
 from typing import Dict, Any
@@ -24,6 +25,9 @@ class MeltingTwin(BaseDigitalTwin):
             "anomaly_flag": False,
             "anomaly_type": "normal",
             "anomaly_severity": 0.0,
+            "anomaly_transition": False,
+            "anomaly_detection": {},
+            "emergency_tft_context": {},
             "forecast": [],
             "updated_at": datetime.now().isoformat()
         }
@@ -55,7 +59,13 @@ class MeltingTwin(BaseDigitalTwin):
         await redis_manager.set_digital_twin_state("melting", batch_id, self.current_state)
         return self.current_state
 
-    async def process_row(self, row: Dict[str, Any], timestamp: str) -> Dict[str, Any]:
+    async def process_row(
+        self,
+        row: Dict[str, Any],
+        timestamp: str,
+        *,
+        dataset_name: str = "furnace_sensor.csv",
+    ) -> Dict[str, Any]:
         """Update one source row atomically and run furnace models on the latest window."""
         numeric_fields = (
             "melt_temp", "power_kw", "vibration_g", "lining_health_index",
@@ -67,25 +77,69 @@ class MeltingTwin(BaseDigitalTwin):
             "operating_state": str(row.get("operating_state", self.current_state["operating_state"])),
             "updated_at": timestamp,
         })
-        features: Dict[str, float] = {}
+        features: Dict[str, Any] = {}
         for field in numeric_fields:
             if row.get(field) is not None:
                 value = float(row[field])
                 features[field] = value
                 state_field = "lining_health" if field == "lining_health_index" else field
                 self.current_state[state_field] = value
+        features["operating_state"] = self.current_state["operating_state"]
         self.sensor_history.append(features)
-        detection = lstm_autoencoder.detect_anomaly([{"features": item} for item in self.sensor_history])
+        # The provided incident replay begins its excursion after the opening
+        # stable rows.  Calibrating there prevents a critical row from being
+        # silently treated as the detector's baseline.
+        if len(self.sensor_history) == 20:
+            await asyncio.to_thread(
+                lstm_autoencoder.calibrate_baseline,
+                [{"features": item} for item in self.sensor_history],
+            )
+        was_anomaly = bool(self.current_state.get("anomaly_flag", False))
+        detection = await asyncio.to_thread(
+            lstm_autoencoder.detect_anomaly,
+            [{"features": item} for item in self.sensor_history],
+        )
+        is_anomaly = bool(detection.get("is_anomaly", False))
         self.current_state.update({
             "anomaly_score": detection.get("anomaly_score", 0.0),
-            "anomaly_flag": detection.get("is_anomaly", False),
+            "anomaly_flag": is_anomaly,
+            # A cascade starts once when the detector crosses the threshold; it
+            # is not re-run for every anomalous CSV row in a sustained event.
+            "anomaly_transition": is_anomaly and not was_anomaly,
+            "anomaly_detection": detection,
             "anomaly_severity": detection.get("anomaly_score", 0.0),
-            "anomaly_type": "sensor_reconstruction_error" if detection.get("is_anomaly") else "normal",
+            "anomaly_type": "sensor_reconstruction_error" if is_anomaly else "normal",
         })
         forecast_at = self.current_state.get("forecast", {}).get("generated_at") if isinstance(self.current_state.get("forecast"), dict) else None
         hours_since_forecast = (datetime.fromisoformat(timestamp) - datetime.fromisoformat(forecast_at)).total_seconds() / 3600 if forecast_at else None
-        if detection.get("is_anomaly") or not self.current_state["forecast"] or (hours_since_forecast is not None and hours_since_forecast >= 1):
-            forecast = tft_model.forecast(
+        if self.current_state["anomaly_transition"]:
+            # The emergency run uses the real replay CSV up to this event, not
+            # a synthetic history.  The LSTM still receives its exact 30-row
+            # sliding anomaly window above.
+            context = await asyncio.to_thread(
+                dataset_loader.temporal_context,
+                dataset_name,
+                timestamp,
+                furnace_id=self.current_state["furnace_id"],
+                lookback_hours=24 * 7,
+                max_samples=168,
+            )
+            context_rows = context.get("rows") or list(self.sensor_history)
+            forecast = await asyncio.to_thread(
+                tft_model.forecast,
+                current_temp=self.current_state["melt_temp"],
+                lining_health=self.current_state["lining_health"],
+                horizon_hours=48,
+                forecast_at=timestamp,
+                history=context_rows,
+            )
+            self.current_state["emergency_tft_context"] = {
+                key: value for key, value in context.items() if key != "rows"
+            }
+            self.current_state["forecast"] = {**forecast, "generated_at": timestamp}
+        elif not self.current_state["forecast"] or (hours_since_forecast is not None and hours_since_forecast >= 1):
+            forecast = await asyncio.to_thread(
+                tft_model.forecast,
                 current_temp=self.current_state["melt_temp"],
                 lining_health=self.current_state["lining_health"],
                 horizon_hours=48,

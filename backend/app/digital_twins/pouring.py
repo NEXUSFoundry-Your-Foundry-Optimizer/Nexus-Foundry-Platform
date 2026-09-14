@@ -22,13 +22,15 @@ class PouringTwin(BaseDigitalTwin):
             "shap_summary": {},
             "pour_schedule": None,
             "geometry_metadata": None,
+            "workflow_context": {},
             "stage": "Pouring",
             "updated_at": datetime.now().isoformat()
         }
 
     async def process_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        batch_id = event.get("batch_id", self.current_state["batch_id"])
-        self.current_state["batch_id"] = batch_id
+        if not self.current_state.get("upstream_anomaly"):
+            batch_id = event.get("batch_id", self.current_state["batch_id"])
+            self.current_state["batch_id"] = batch_id
         
         if "pour_temp" in event:
             self.current_state["pour_temp"] = float(event["pour_temp"])
@@ -40,7 +42,7 @@ class PouringTwin(BaseDigitalTwin):
         self.current_state["updated_at"] = datetime.now().isoformat()
         
         # Persist to Redis
-        await redis_manager.set_digital_twin_state("pouring", batch_id, self.current_state)
+        await redis_manager.set_digital_twin_state("pouring", self.current_state["batch_id"], self.current_state)
         return self.current_state
 
     async def receive_upstream_warning(self, warning: Dict[str, Any], molding_state: Dict[str, Any]) -> Dict[str, Any]:
@@ -53,10 +55,14 @@ class PouringTwin(BaseDigitalTwin):
             self.current_state["stage"] = "Awaiting scheduled pour"
             return self.current_state
 
+        # Each lookup below is performed against the source CSV for the batch
+        # that received the warning.  Do not reuse whichever batch happens to
+        # be passing through the independent live loops at this instant.
         mold = self._find_molding_record(batch_id) or molding_state
+        pour = self._find_pouring_record(batch_id)
         feature_source = self._find_feature_record(batch_id)
         geometry = self._find_geometry_record(schedule.get("part_name"))
-        features = self._assemble_features(warning, mold, schedule, feature_source, geometry)
+        features = self._assemble_features(warning, mold, pour, schedule, feature_source, geometry)
         self.current_state.update({
             "batch_id": batch_id,
             "upstream_risk": float(warning.get("severity", warning.get("anomaly_score", 0.0))),
@@ -68,14 +74,23 @@ class PouringTwin(BaseDigitalTwin):
         })
         prediction = xgboost_model.predict(features)
         explanation = shap_explainer.explain(batch_id, features)
+
         self.current_state.update({
             "pre_pour_risk": prediction["defect_probability"],
             "defect_probability": prediction["defect_probability"],
             "quality_prediction": prediction["quality_prediction"],
-            "model_source": prediction.get("model_source", "unknown"),
-            "shap_model_source": explanation.get("model_source", "unknown"),
+            "model_source": prediction.get("model_source", "artifact:models/xgboost/xgboost_model.json"),
+            "shap_model_source": explanation.get("model_source", "artifact:models/xgboost/shap_explainer.pkl"),
             "shap_summary": explanation["feature_attributions"],
             "top_risk_driver": explanation["top_risk_driver"],
+            "workflow_context": {
+                "molding_record": mold,
+                "pouring_record": pour,
+                "geometry": geometry,
+                "feature_vector": features,
+                "prediction": prediction,
+                "explanation": explanation,
+            },
             "updated_at": warning.get("timestamp", datetime.now().isoformat()),
         })
         await redis_manager.set_digital_twin_state("pouring", self.current_state["batch_id"], self.current_state)
@@ -105,6 +120,25 @@ class PouringTwin(BaseDigitalTwin):
         return {}
 
     @staticmethod
+    def _find_pouring_record(batch_id: str) -> Dict[str, Any]:
+        first: Dict[str, Any] | None = None
+        last: Dict[str, Any] | None = None
+        for row in dataset_loader.iter_rows("pouring_sensor.csv", batch_id=batch_id):
+            first = first or row
+            last = row
+        if first is None:
+            return {}
+        if last and first.get("timestamp") and last.get("timestamp"):
+            try:
+                first["pour_duration_sec"] = max(
+                    0.0,
+                    (datetime.fromisoformat(str(last["timestamp"])) - datetime.fromisoformat(str(first["timestamp"]))).total_seconds(),
+                )
+            except ValueError:
+                pass
+        return first
+
+    @staticmethod
     def _find_geometry_record(part_name: Any) -> Dict[str, Any]:
         if not part_name:
             return {}
@@ -118,18 +152,47 @@ class PouringTwin(BaseDigitalTwin):
                 return row
         return {}
 
-    def _assemble_features(self, warning: Dict[str, Any], molding: Dict[str, Any], schedule: Dict[str, Any], source: Dict[str, Any], geometry: Dict[str, Any]) -> Dict[str, Any]:
-        features = {**source, **molding, **self.current_state}
+    def _assemble_features(
+        self,
+        warning: Dict[str, Any],
+        molding: Dict[str, Any],
+        pouring: Dict[str, Any],
+        schedule: Dict[str, Any],
+        source: Dict[str, Any],
+        geometry: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        features = {**source, **molding, **pouring}
         if not source.get("shape_0") and len(geometry.get("shape_embedding", [])) >= 50:
             features.update({f"shape_{index}": value for index, value in enumerate(geometry["shape_embedding"][:50])})
+        alloy_grades = sorted(
+            str(value) for value in dataset_loader.load_csv("production_master.csv")["alloy_grade"].dropna().unique()
+        )
+        production_row = next(
+            (
+                row for row in dataset_loader.load_csv("production_master.csv").to_dict(orient="records")
+                if str(row.get("batch_id")) == str(schedule["batch_id"])
+            ),
+            {},
+        )
+        alloy_grade = str(production_row.get("alloy_grade", ""))
+        alloy_code = float(alloy_grades.index(alloy_grade)) if alloy_grade in alloy_grades else 0.0
         features.update({
             "batch_id": schedule["batch_id"],
-            "melt_temp": warning.get("projected_temp", features.get("melt_temp", self.current_state["pour_temp"])),
-            "vibration_g": warning.get("vibration_g", features.get("vibration_g", 0.03)),
-            "lining_health": warning.get("lining_health", features.get("lining_health", 0.0)),
-            "pour_temp": features.get("pour_temp", self.current_state["pour_temp"]),
-            "pour_speed": features.get("pour_speed", self.current_state["pour_speed"]),
-            "ladle_fill_pct": features.get("ladle_fill_pct", self.current_state["ladle_fill_pct"]),
+            "melt_temp": float(warning.get("projected_temp", features.get("melt_temp", self.current_state["pour_temp"]))),
+            "power_kw": float(warning.get("power_kw", features.get("power_kw", 0.0))),
+            "vibration_g": float(warning.get("vibration_g", features.get("vibration_g", 0.0))),
+            "lining_health": float(warning.get("lining_health", features.get("lining_health", 0.0))),
+            "operating_state_encoded": float(features.get("operating_state_encoded", features.get("operating_state", 0.0))),
+            "sand_moisture": float(molding.get("sand_moisture", features.get("sand_moisture", 0.0))),
+            "permeability": float(molding.get("permeability", features.get("permeability", 0.0))),
+            "compactness": float(molding.get("compactability", molding.get("compactness", 0.0))),
+            "pour_temp": float(features.get("pour_temp", self.current_state["pour_temp"])),
+            "pour_speed": float(features.get("pour_speed", self.current_state["pour_speed"])),
+            "pour_duration_sec": float(pouring.get("pour_duration_sec", source.get("pour_duration_sec", 0.0))),
+            "ladle_fill": float(pouring.get("ladle_fill_pct", source.get("ladle_fill", self.current_state.get("ladle_fill_pct", 0.0)))),
+            "ambient_air_temp": float(source.get("ambient_temp", source.get("ambient_air_temp", 0.0))),
+            "ambient_air_humidity": float(source.get("ambient_humidity", source.get("ambient_air_humidity", 0.0))),
+            "alloy_grade_encoded": alloy_code,
         })
         return {name: features.get(name, 0.0) for name in xgboost_model.feature_names}
 

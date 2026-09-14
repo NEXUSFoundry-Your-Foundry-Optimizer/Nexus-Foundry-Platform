@@ -27,6 +27,18 @@ class SHAPExplainer:
             )
             values = self.explainer.shap_values(frame)[0]
             attributions = {name: round(float(value), 4) for name, value in zip(self.feature_names, values)}
+            magnitude_total = sum(abs(value) for value in attributions.values()) or 1.0
+            groups = {
+                "temperature": ("melt_temp", "pour_temp"),
+                "lining": ("lining_health",),
+                "geometry": tuple(name for name in self.feature_names if name.startswith("shape_")),
+                "molding": ("sand_moisture", "permeability", "compactness"),
+                "pouring": ("pour_speed", "pour_duration_sec", "ladle_fill"),
+            }
+            contribution_groups = {
+                label: round(sum(abs(attributions.get(name, 0.0)) for name in names) / magnitude_total * 100, 2)
+                for label, names in groups.items()
+            }
             expected = self.explainer.expected_value
             base_value = float(expected[0] if hasattr(expected, "__len__") else expected)
             return {
@@ -34,29 +46,19 @@ class SHAPExplainer:
                 "batch_id": features.get("batch_id", "BATCH-DEFAULT"),
                 "base_value": base_value,
                 "feature_attributions": attributions,
+                "contribution_groups": contribution_groups,
                 "top_risk_driver": max(attributions, key=lambda key: abs(attributions[key])),
-                "model_source": "trained:shap_explainer.pkl",
+                "model_source": "artifact:models/xgboost/shap_explainer.pkl",
             }
 
-        melt_temp = float(features.get("melt_temp", 1380.0))
-        vibration = float(features.get("vibration_g", 0.03))
-        sand_moisture = float(features.get("sand_moisture", 4.0))
-        power_kw = float(features.get("power_kw", 800.0))
-        
-        attributions = {
-            "melt_temp": round((melt_temp - 1380.0) * 0.005 + 0.12, 4),
-            "vibration_g": round(vibration * 3.5, 4),
-            "sand_moisture": round((sand_moisture - 4.0) * 0.08, 4),
-            "power_kw": round((power_kw - 800.0) * 0.001, 4)
-        }
-        
         return {
             "prediction_id": prediction_id,
             "batch_id": features.get("batch_id", "BATCH-DEFAULT"),
-            "base_value": 0.05,
-            "feature_attributions": attributions,
-            "top_risk_driver": max(attributions, key=attributions.get),
-            "model_source": "fallback:formula",
+            "base_value": None,
+            "feature_attributions": {},
+            "top_risk_driver": None,
+            "model_source": "unavailable:trained_shap_artifact",
+            "error": self.load_error,
         }
 
 shap_explainer = SHAPExplainer()

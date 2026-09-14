@@ -22,6 +22,7 @@ from backend.app.api.v1.sensors import router as sensors_router
 from backend.app.api.v1.anomalies import router as anomalies_router
 from backend.app.api.v1.quality import router as quality_router, InspectionRequest, inspect_quality
 from backend.app.api.v1.risk import router as risk_router
+from backend.app.api.v1.workflows import router as workflows_router
 from backend.app.digital_twins.melting import melting_twin
 from backend.app.digital_twins.molding import molding_twin
 from backend.app.digital_twins.pouring import pouring_twin
@@ -63,21 +64,31 @@ app.include_router(sensors_router, prefix="/api/v1")
 app.include_router(anomalies_router, prefix="/api/v1")
 app.include_router(quality_router, prefix="/api/v1")
 app.include_router(risk_router, prefix="/api/v1")
+app.include_router(workflows_router, prefix="/api/v1")
+
+from backend.app.kafka.consumer import kafka_consumer
+from backend.app.mqtt.subscriber import mqtt_subscriber
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("Initializing NEXUS-Foundry microservices stack...")
     mqtt_publisher.connect()
+    mqtt_subscriber.connect()
     await kafka_producer.start()
+    await kafka_consumer.start()
     await init_postgres()
     await influx_manager.connect()
     await redis_manager.connect()
+    from backend.app.simulator.replay_controller import replay_controller
+    from backend.app.simulator.simulator_state import global_simulator_state
     if not global_simulator_state.is_running:
         await replay_controller.start(dataset_name="furnace_sensor.csv", speed=1.0)
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    mqtt_subscriber.disconnect()
     mqtt_publisher.disconnect()
+    await kafka_consumer.stop()
     await kafka_producer.stop()
     await influx_manager.close()
 
@@ -93,14 +104,17 @@ async def root():
 async def health_check():
     return {"status": "ok", "service": "nexus-foundry", "simulation": "available"}
 
+from backend.app.ml.tft import tft_model
+from backend.app.ml.pinn import pinn_model
+
 @app.get("/api/models/status")
 async def model_status():
     return {
         "xgboost": {"loaded": xgboost_model.model is not None, "error": xgboost_model.load_error},
         "shap": {"loaded": shap_explainer.explainer is not None, "error": shap_explainer.load_error},
         "lstm_autoencoder": {"loaded": lstm_autoencoder.model is not None, "error": lstm_autoencoder.load_error},
-        "tft": {"loaded": False, "error": "TFT weights were not uploaded; only tft_scaler.pkl is present"},
-        "pinn": {"loaded": False, "error": "A loadable .pth checkpoint and model class are not present; pinn_model_best is a checkpoint directory"},
+        "tft": {"loaded": tft_model.loaded, "error": None if tft_model.loaded else "TFT weights not loaded"},
+        "pinn": {"loaded": pinn_model.loaded, "error": None if pinn_model.loaded else "PINN weights not loaded"},
     }
 
 @app.get("/api/dashboard/summary")

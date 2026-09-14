@@ -73,3 +73,5 @@ async def what_if(request: WhatIfRequest):
         "cooling_rate": simulation["cooling_rate_deg_per_sec"],
         "recommendation": simulation["recommendation"],
     }
+
+

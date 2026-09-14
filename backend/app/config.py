@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     MQTT_BROKER_PORT: int = int(os.getenv("MQTT_BROKER_PORT", 1883))
     MQTT_CLIENT_ID: str = "nexus-simulator"
     
-    # Kafka
-    KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    # Kafka — use 29092 when running outside Docker (PLAINTEXT_HOST listener)
+    KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
     
     # Postgres
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "nexus")

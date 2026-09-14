@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ /app/backend/
 COPY Datasets/ /app/Datasets/
+COPY models/ /app/models/
 
 ENV PYTHONPATH=/app/backend
 

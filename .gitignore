@@ -31,6 +31,16 @@ dist-ssr
 *.sln
 *.sw?
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+
 # Large dataset files exceeding GitHub 100MB limit
 Datasets/furnace_sensor.csv
 Datasets/*.csv
@@ -38,4 +48,5 @@ Datasets/*.npy
 !Datasets/material_properties.csv
 !Datasets/geometry_metadata.csv
 !Datasets/xgboost_features.csv
+
 

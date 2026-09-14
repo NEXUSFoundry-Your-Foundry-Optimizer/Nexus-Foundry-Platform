@@ -5,7 +5,7 @@ interface ForecastResponse { forecasts: { timestamp: string; p10: number; p50: n
 
 /** FR-04: 48-hour degradation forecast with P10 / P50 / P90 quantile bands. */
 export function TFTChart() {
-  const { data } = useLiveCollection<ForecastResponse>("/api/v1/predictions/tft?horizon=24", 10000);
+  const { data } = useLiveCollection<ForecastResponse>("/api/v1/predictions/tft?horizon=48", 10000);
   const band = (data?.forecasts ?? []).map((point) => ({ ...point, h: new Date(point.timestamp).toLocaleTimeString("en-GB", { hour12: false }).slice(0, 5), range: [point.p10, point.p90] as [number, number] }));
   return (
     <div className="h-[300px] w-full">

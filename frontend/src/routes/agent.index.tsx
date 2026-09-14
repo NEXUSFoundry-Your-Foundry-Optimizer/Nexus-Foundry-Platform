@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MessageSquare, Zap, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { useState } from "react";
 
 export const Route = createFileRoute("/agent/")({
   component: AgentHub,
 });
 
-const cardVariantsLeft = {
+const cardVariantsLeft: Variants = {
   hidden: {
     opacity: 0,
     x: 60,
@@ -29,7 +29,7 @@ const cardVariantsLeft = {
   },
 };
 
-const cardVariantsRight = {
+const cardVariantsRight: Variants = {
   hidden: {
     opacity: 0,
     x: -60,

@@ -88,6 +88,14 @@ export function Navbar() {
         <div className="hidden items-center gap-7 lg:flex">
           <Dropdown label="Twins" items={twinLinks} />
           <Link
+            to="/live-workflow"
+            className="text-sm font-medium text-amber-400 transition-colors hover:text-amber-300 flex items-center gap-1"
+            activeProps={{ className: "text-amber-300 font-bold" }}
+          >
+            <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+            Live Workflow
+          </Link>
+          <Link
             to="/dashboard"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             activeProps={{ className: "text-foreground" }}
@@ -147,6 +155,9 @@ export function Navbar() {
             ))}
           </div>
           <div className="grid gap-1">
+            <Link to="/live-workflow" className="py-1.5 text-sm font-semibold text-amber-400">
+              ⚡ Live Workflow
+            </Link>
             <Link to="/dashboard" className="py-1.5 text-sm">
               Dashboard
             </Link>

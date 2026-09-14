@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as LiveWorkflowRouteImport } from './routes/live-workflow'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as AgentIndexRouteImport } from './routes/agent.index'
@@ -32,6 +33,11 @@ const AnalyticsRoute = AnalyticsRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveWorkflowRoute = LiveWorkflowRouteImport.update({
+  id: '/live-workflow',
+  path: '/live-workflow',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotificationsRoute = NotificationsRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/dashboard': typeof DashboardRoute
+  '/live-workflow': typeof LiveWorkflowRoute
   '/notifications': typeof NotificationsRoute
   '/profile': typeof ProfileRoute
   '/agent/pinn': typeof AgentPinnRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/dashboard': typeof DashboardRoute
+  '/live-workflow': typeof LiveWorkflowRoute
   '/notifications': typeof NotificationsRoute
   '/profile': typeof ProfileRoute
   '/agent/pinn': typeof AgentPinnRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/dashboard': typeof DashboardRoute
+  '/live-workflow': typeof LiveWorkflowRoute
   '/notifications': typeof NotificationsRoute
   '/profile': typeof ProfileRoute
   '/agent/pinn': typeof AgentPinnRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/dashboard'
+    | '/live-workflow'
     | '/notifications'
     | '/profile'
     | '/agent/pinn'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/dashboard'
+    | '/live-workflow'
     | '/notifications'
     | '/profile'
     | '/agent/pinn'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/dashboard'
+    | '/live-workflow'
     | '/notifications'
     | '/profile'
     | '/agent/pinn'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
   DashboardRoute: typeof DashboardRoute
+  LiveWorkflowRoute: typeof LiveWorkflowRoute
   NotificationsRoute: typeof NotificationsRoute
   ProfileRoute: typeof ProfileRoute
   AgentPinnRoute: typeof AgentPinnRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live-workflow': {
+      id: '/live-workflow'
+      path: '/live-workflow'
+      fullPath: '/live-workflow'
+      preLoaderRoute: typeof LiveWorkflowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notifications': {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
   DashboardRoute: DashboardRoute,
+  LiveWorkflowRoute: LiveWorkflowRoute,
   NotificationsRoute: NotificationsRoute,
   ProfileRoute: ProfileRoute,
   AgentPinnRoute: AgentPinnRoute,

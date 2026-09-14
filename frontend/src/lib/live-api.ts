@@ -16,16 +16,20 @@ export interface LivePoint {
 
 export function formatLiveValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "--";
-  if (typeof value === "number") return value.toFixed(2);
+  if (typeof value === "number") {
+    if (key === "pre_pour_risk" || key === "defect_probability" || key === "risk_score") return (value * 100).toFixed(2);
+    return value.toFixed(2);
+  }
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
 }
 
-const API_URL = (import.meta.env["VITE_API_URL"] ?? "http://localhost:8000").replace(/\/$/, "");
+export const API_URL = (import.meta.env["VITE_API_URL"] ?? "http://localhost:8000").replace(/\/$/, "");
 const WS_URL = API_URL.replace(/^http/, "ws");
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`);
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const response = await fetch(`${API_URL}${cleanPath}`);
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return response.json() as Promise<T>;
 }
@@ -33,12 +37,14 @@ async function getJson<T>(path: string): Promise<T> {
 function toPoint(twin: TwinId, state: LiveState): LivePoint {
   const value = (key: string, fallback = 0) => Number(state[key] ?? fallback);
   const mapping: [number, number, number] = {
-    melting: [value("melt_temp"), value("power_kw"), value("vibration_g") * 10000],
-    molding: [value("sand_moisture") * 100, value("permeability"), value("green_strength") / 10],
-    pouring: [value("pour_temp"), value("ladle_fill_pct"), value("pour_speed") * 100],
-    quality: [value("defect_risk") * 100, value("quality_score") * 100, value("severity")],
+    melting: [value("melt_temp", 1380), value("power_kw", 800), value("vibration_g", 0.03) * 10000],
+    molding: [value("sand_moisture", 4.2) * 100, value("permeability", 118), value("green_strength", 96) / 10],
+    pouring: [value("pour_temp", 1445), value("ladle_fill_pct", 88), value("pour_speed", 0.85) * 100],
+    quality: [value("defect_risk", 0.1) * 100, value("quality_score", 0.95) * 100, value("severity", 0)],
   }[twin] as [number, number, number];
-  return { t: new Date(state.updated_at).toLocaleTimeString("en-GB", { hour12: false }).slice(3), temp: Number(mapping[0].toFixed(2)), power: Number(mapping[1].toFixed(2)), vibration: Number(mapping[2].toFixed(2)) };
+  
+  const timeStr = state.updated_at ? new Date(state.updated_at).toLocaleTimeString("en-GB", { hour12: false }).slice(3) : new Date().toLocaleTimeString("en-GB", { hour12: false }).slice(3);
+  return { t: timeStr, temp: Number(mapping[0].toFixed(2)), power: Number(mapping[1].toFixed(2)), vibration: Number(mapping[2].toFixed(2)) };
 }
 
 export function useLiveTwin(twin: TwinId) {
@@ -46,12 +52,16 @@ export function useLiveTwin(twin: TwinId) {
   const [history, setHistory] = useState<LivePoint[]>([]);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const backoffDelayRef = useRef<number>(1000);
 
   useEffect(() => {
     let active = true;
+
+    // Fetch initial state & history series
     Promise.all([
       getJson<LiveState>(`/api/v1/digital-twins/${twin}/state`),
-      getJson<{ series: LiveState[] }>(`/api/v1/sensors/series/${twin}?points=40`),
+      getJson<{ series: LiveState[] }>(`/api/v1/sensors/series/${twin}?points=40`).catch(() => ({ series: [] })),
     ])
       .then(([initial, response]) => {
         if (!active) return;
@@ -61,21 +71,53 @@ export function useLiveTwin(twin: TwinId) {
       })
       .catch((cause: Error) => active && setError(cause.message));
 
-    const socket = new WebSocket(`${WS_URL}/ws`);
-    socketRef.current = socket;
-    socket.onopen = () => socket.send("subscribe");
-    socket.onmessage = (message) => {
-      const payload = JSON.parse(message.data) as { type?: string; twin?: TwinId; state?: LiveState };
-      if (active && payload.type === "digital_twin_update" && payload.twin === twin && payload.state) {
-        setState(payload.state);
-        setHistory((previous) => [...previous.slice(-39), toPoint(twin, payload.state!) ]);
-      }
+    // Connect WebSocket with exponential backoff auto-reconnect
+    const connectWs = () => {
+      if (!active) return;
+      const socket = new WebSocket(`${WS_URL}/ws`);
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (!active) return;
+        backoffDelayRef.current = 1000;
+        setError(null);
+        socket.send("subscribe");
+      };
+
+      socket.onmessage = (message) => {
+        if (!active) return;
+        try {
+          const payload = JSON.parse(message.data) as { type?: string; twin?: TwinId; state?: LiveState };
+          if (payload.type === "digital_twin_update" && payload.twin === twin && payload.state) {
+            setState(payload.state);
+            setHistory((previous) => [...previous.slice(-39), toPoint(twin, payload.state!)]);
+          }
+        } catch {
+          // Ignore invalid JSON frame
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) return;
+        const nextDelay = Math.min(backoffDelayRef.current * 1.5, 10000);
+        backoffDelayRef.current = nextDelay;
+        reconnectTimeoutRef.current = setTimeout(connectWs, nextDelay);
+      };
+
+      socket.onerror = () => {
+        if (active) setError("Live stream reconnecting...");
+      };
     };
-    socket.onerror = () => active && setError("Live stream unavailable");
+
+    connectWs();
+
     return () => {
       active = false;
-      socket.close();
-      socketRef.current = null;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
     };
   }, [twin]);
 
@@ -85,21 +127,33 @@ export function useLiveTwin(twin: TwinId) {
 export function useLiveDashboard() {
   const [data, setData] = useState<{ twins: Record<TwinId, LiveState> } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     let active = true;
     getJson<{ twins: Record<TwinId, LiveState> }>("/api/dashboard/summary")
       .then((summary) => active && setData(summary))
       .catch((cause: Error) => active && setError(cause.message));
+
     const socket = new WebSocket(`${WS_URL}/ws`);
     socket.onopen = () => socket.send("subscribe");
     socket.onmessage = (message) => {
-      const payload = JSON.parse(message.data) as { type?: string; twin?: TwinId; state?: LiveState };
-      if (active && payload.type === "digital_twin_update" && payload.twin && payload.state) {
-        setData((previous) => previous ? { twins: { ...previous.twins, [payload.twin!]: payload.state! } } : previous);
+      if (!active) return;
+      try {
+        const payload = JSON.parse(message.data) as { type?: string; twin?: TwinId; state?: LiveState };
+        if (payload.type === "digital_twin_update" && payload.twin && payload.state) {
+          setData((previous) => (previous ? { twins: { ...previous.twins, [payload.twin!]: payload.state! } } : previous));
+        }
+      } catch {
+        // Ignore invalid frame
       }
     };
-    return () => { active = false; socket.close(); };
+
+    return () => {
+      active = false;
+      socket.close();
+    };
   }, []);
+
   return { data, error };
 }
 
@@ -124,18 +178,28 @@ export interface LiveBatch {
 export function useLiveCollection<T>(path: string, interval = 2000) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     let active = true;
-    const load = () => getJson<T>(path).then((value) => active && setData(value)).catch((cause: Error) => active && setError(cause.message));
+    const load = () =>
+      getJson<T>(path)
+        .then((value) => active && setData(value))
+        .catch((cause: Error) => active && setError(cause.message));
+
     load();
     const timer = window.setInterval(load, interval);
-    return () => { active = false; window.clearInterval(timer); };
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [path, interval]);
+
   return { data, error };
 }
 
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const response = await fetch(`${API_URL}${cleanPath}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

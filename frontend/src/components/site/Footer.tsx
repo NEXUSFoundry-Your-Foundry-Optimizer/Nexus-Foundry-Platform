@@ -60,7 +60,7 @@ export function Footer() {
             <p className="eyebrow mb-6 text-[#888888]">INTELLIGENCE</p>
             <ul className="space-y-4 text-sm text-white">
               <li>
-                <Link to="/agent/hub" className="transition-colors hover:text-[#ff5500]">
+                <Link to="/agent" className="transition-colors hover:text-[#ff5500]">
                   Agent Hub
                 </Link>
               </li>
@@ -75,8 +75,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/stack" className="transition-colors hover:text-[#ff5500]">
-                  Tech Stack
+                <Link to="/live-workflow" className="transition-colors hover:text-[#ff5500]">
+                  Live Workflow
                 </Link>
               </li>
             </ul>

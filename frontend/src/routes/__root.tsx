@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  useNavigate,
   useRouter,
   useRouterState,
   HeadContent,
@@ -15,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { Toaster } from "@/components/ui/sonner";
+import { API_URL, useLiveDashboard } from "@/lib/live-api";
 
 function NotFoundComponent() {
   return (
@@ -125,7 +127,7 @@ function RootComponent() {
 
   useEffect(() => {
     // Auto-start live simulation stream on frontend mount
-    fetch("http://localhost:8000/api/v1/simulation/start?dataset_name=furnace_sensor.csv&speed=1.0", {
+    fetch(`${API_URL}/api/v1/simulation/start?dataset_name=furnace_sensor.csv&speed=1.0`, {
       method: "POST"
     }).catch(() => {
       // Backend handles simulation loop
@@ -135,6 +137,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex min-h-screen flex-col bg-background">
+        <AnomalyRouteController />
         <Navbar />
         <main className="flex-1 pt-16">
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
@@ -145,4 +148,20 @@ function RootComponent() {
       <Toaster />
     </QueryClientProvider>
   );
+}
+
+/** Routes an operator to the dashboard as soon as the backend confirms an anomaly. */
+function AnomalyRouteController() {
+  const { data } = useLiveDashboard();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isAnomaly = Number(data?.twins?.melting?.["anomaly_score"] ?? 0) > 0.78;
+
+  useEffect(() => {
+    if (isAnomaly && pathname !== "/dashboard" && pathname !== "/live-workflow") {
+      navigate({ to: "/dashboard" });
+    }
+  }, [isAnomaly, navigate, pathname]);
+
+  return null;
 }

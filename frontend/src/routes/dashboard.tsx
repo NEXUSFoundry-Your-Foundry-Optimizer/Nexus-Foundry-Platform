@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -10,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowUpRight, Droplets, Flame, Layers, Scan } from "lucide-react";
+import { ArrowUpRight, Droplets, Flame, Layers, Scan, AlertTriangle, ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
 import { StatusPill } from "@/components/site/StatusPill";
 import { TFTChart } from "@/components/charts/TFTChart";
@@ -39,7 +40,7 @@ function headline(id: keyof typeof TWINS, state: Record<string, unknown> | undef
   if (!state) return "Loading...";
   if (id === "melting") return `${Number(state["melt_temp"] ?? 0).toFixed(2)}°C`;
   if (id === "molding") return `${Number(state["sand_moisture"] ?? 0).toFixed(2)}%`;
-  if (id === "pouring") return `${Number(state["pre_pour_risk"] ?? state["upstream_risk"] ?? 0).toFixed(2)}% risk`;
+  if (id === "pouring") return `${(Number(state["pre_pour_risk"] ?? state["upstream_risk"] ?? 0) * 100).toFixed(2)}% risk`;
   return `${Number(state["defect_risk"] ?? 0).toFixed(2)}`;
 }
 
@@ -69,6 +70,29 @@ function Dashboard() {
   const { history } = useLiveTwin("melting");
   const { data: batches } = useLiveCollection<LiveBatch[]>("/api/batches");
   const { data: alerts } = useLiveCollection<LiveAlert[]>("/api/v1/alerts/active");
+  const navigate = useNavigate();
+
+  const isAnomaly = Number(liveData?.twins?.melting?.["anomaly_score"] ?? 0) > 0.78;
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isAnomaly && countdown === null) {
+      setCountdown(5);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev !== null && prev <= 1) {
+            clearInterval(timer);
+            navigate({ to: "/live-workflow" });
+            return null;
+          }
+          return prev !== null ? prev - 1 : null;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+    return undefined;
+  }, [isAnomaly, navigate]);
+
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
       <Reveal>
@@ -81,6 +105,32 @@ function Dashboard() {
           {liveError && <p className="w-full text-xs text-warning">{liveError}</p>}
         </div>
       </Reveal>
+
+      {/* Anomaly Live Trigger Banner */}
+      {isAnomaly && (
+        <Reveal delay={0.02} className="mt-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-destructive/60 bg-destructive/15 p-4 text-destructive shadow-lg animate-pulse">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="size-6 shrink-0 text-destructive" />
+              <div>
+                <h3 className="font-bold text-sm sm:text-base">
+                  CRITICAL ANOMALY DETECTED IN MELTING TWIN (Score: {Number(liveData?.twins?.melting?.["anomaly_score"] ?? 0).toFixed(2)} &gt; 0.78)
+                </h3>
+                <p className="text-xs text-foreground/80 mt-0.5">
+                  TFT Degradation Emergency Run triggered. Navigating to Live Workflow in <strong>{countdown ?? 5}s</strong>...
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/live-workflow"
+              className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-destructive-foreground shadow hover:bg-destructive/90 transition-all"
+            >
+              <span>View Live Workflow</span>
+              <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </Reveal>
+      )}
 
       {/* Summary cards */}
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

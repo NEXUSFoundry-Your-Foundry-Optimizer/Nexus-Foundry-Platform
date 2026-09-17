@@ -6,7 +6,10 @@ from typing import Dict, Any
 from pathlib import Path
 from backend.app.simulator.dataset_loader import dataset_loader
 
-MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "pinn" / "pinn_heat_equation.pt"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+MODEL_PATH = PROJECT_ROOT / "models" / "pinn" / "pinn_heat_equation.pt"
+if not MODEL_PATH.exists():
+    MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "pinn" / "pinn_heat_equation.pt"
 
 class HeatEquationPINN(nn.Module):
     def __init__(self, in_features=4, hidden_features=64, out_features=3):

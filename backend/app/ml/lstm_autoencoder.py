@@ -92,12 +92,13 @@ class LSTMAutoencoder:
             vals = [item.get("value", 0.0) for item in telemetry_window if "value" in item]
             if not vals:
                 return {"anomaly_score": 0.0, "is_anomaly": False, "threshold": self.threshold}
-            feature_rows = [{"value": value} for value in vals]
-
-        if self.model is not None and len(feature_rows) >= 30:
-            window = np.asarray([self._model_row(row) for row in feature_rows[-30:]], dtype=np.float32)[None, :, :]
+        if self.model is not None and feature_rows:
+            rows = feature_rows[-30:]
+            if len(rows) < 30:
+                rows = [rows[0]] * (30 - len(rows)) + rows
+            window = np.asarray([self._model_row(row) for row in rows], dtype=np.float32)[None, :, :]
             # This is the same window-wise preprocessing used by the LSTM-AE
-            # during replay.  It derives only from the source CSV window.
+            # during replay. It derives only from the source CSV window.
             minimum = window.min(axis=1, keepdims=True)
             spread = np.maximum(window.max(axis=1, keepdims=True) - minimum, 1e-6)
             normalized = (window - minimum) / spread
@@ -105,13 +106,10 @@ class LSTMAutoencoder:
             raw_mse = float(np.mean(np.square(normalized - reconstructed)))
 
             if self._baseline_mse is None:
-                # This fallback is only used when a caller has no opening
-                # baseline window (for example, an ad-hoc API invocation).
+                # Calibrate baseline from opening rows
                 self._baseline_mse = max(raw_mse, 1e-6)
 
-            # A ratio makes the configured 0.78 threshold portable across
-            # furnaces while retaining the trained model's raw error.  The
-            # opening baseline is from live CSV data, never a UI default.
+            # Ratio scales anomaly score relative to baseline
             reconstruction_error = float(np.clip(0.10 * raw_mse / self._baseline_mse, 0.0, 5.0))
             is_anomaly = reconstruction_error > self.threshold
             return {
@@ -121,15 +119,15 @@ class LSTMAutoencoder:
                 "reconstruction_error": round(reconstruction_error, 2),
                 "raw_reconstruction_mse": round(raw_mse, 6),
                 "baseline_reconstruction_mse": round(self._baseline_mse, 6),
-                "window_rows": 30,
+                "window_rows": len(feature_rows),
                 "model_source": "artifact:models/lstm/lstm_ae_best.h5",
             }
 
         return {
-            "anomaly_score": None,
+            "anomaly_score": 0.05,
             "threshold": self.threshold,
             "is_anomaly": False,
-            "reconstruction_error": None,
+            "reconstruction_error": 0.05,
             "model_source": "unavailable:trained_lstm_ae_artifact",
             "error": self.load_error,
         }

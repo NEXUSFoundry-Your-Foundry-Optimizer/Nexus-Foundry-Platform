@@ -154,7 +154,27 @@ function Dashboard() {
                 </div>
                 <p className="mt-4 text-sm text-muted-foreground">{t.name}</p>
                 <p className="mt-1 font-mono text-2xl">{headline(id, state)}</p>
-                <div className="mt-4">
+                {id === "melting" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Anomaly Score: <span className="font-mono font-semibold text-foreground">{Number(state?.["anomaly_score"] ?? 0.10).toFixed(2)}</span> / 0.78
+                  </p>
+                )}
+                {id === "pouring" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Pour Temp: <span className="font-mono font-semibold text-foreground">{Number(state?.["pour_temp"] ?? 1445).toFixed(0)}°C</span>
+                  </p>
+                )}
+                {id === "molding" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Permeability: <span className="font-mono font-semibold text-foreground">{Number(state?.["permeability"] ?? 118).toFixed(0)} AFS</span>
+                  </p>
+                )}
+                {id === "quality" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Visual Status: <span className="font-mono font-semibold text-foreground">{String(state?.["inspection_result"] ?? "PASS")}</span>
+                  </p>
+                )}
+                <div className="mt-3">
                   <StatusPill status={status} />
                 </div>
               </Link>

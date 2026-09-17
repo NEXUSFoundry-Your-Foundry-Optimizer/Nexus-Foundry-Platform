@@ -17,7 +17,7 @@ class KafkaProducerClient:
                 bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
                 value_serializer=lambda v: json.dumps(v).encode("utf-8")
             )
-            await self.producer.start()
+            await asyncio.wait_for(self.producer.start(), timeout=2.0)
             self.started = True
             logger.info("AIOKafkaProducer started successfully")
         except Exception as e:

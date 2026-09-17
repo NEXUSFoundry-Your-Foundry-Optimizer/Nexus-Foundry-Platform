@@ -38,7 +38,8 @@ class InfluxDBManager:
                 
             await write_api.write(bucket=settings.INFLUXDB_BUCKET, org=settings.INFLUXDB_ORG, record=point)
         except Exception as e:
-            logger.error(f"Error writing to InfluxDB: {e}")
+            self.connected = False
+            logger.warning(f"InfluxDB host unreachable ({e}). Gracefully switching to in-memory mode.")
 
     async def close(self):
         if self.client:

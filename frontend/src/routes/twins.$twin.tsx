@@ -88,7 +88,12 @@ function TwinPage() {
 
       <div className="mt-10 grid gap-5 lg:grid-cols-2">
         <Reveal>
-          <TwinVisual variant={variants[twin]} className="h-[360px] w-full" label={`Rendering ${meta.name}`} />
+          <TwinVisual
+            variant={variants[twin]}
+            className="h-[360px] w-full"
+            label={`Rendering ${meta.name}`}
+            live={liveState as Record<string, unknown> | null}
+          />
         </Reveal>
         <Reveal delay={0.08}>
           <div className="surface-panel h-full p-5">

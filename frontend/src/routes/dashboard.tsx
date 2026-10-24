@@ -73,25 +73,6 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const isAnomaly = Number(liveData?.twins?.melting?.["anomaly_score"] ?? 0) > 0.78;
-  const [countdown, setCountdown] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (isAnomaly && countdown === null) {
-      setCountdown(5);
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev !== null && prev <= 1) {
-            clearInterval(timer);
-            navigate({ to: "/live-workflow" });
-            return null;
-          }
-          return prev !== null ? prev - 1 : null;
-        });
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-    return undefined;
-  }, [isAnomaly, navigate]);
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
@@ -117,17 +98,25 @@ function Dashboard() {
                   CRITICAL ANOMALY DETECTED IN MELTING TWIN (Score: {Number(liveData?.twins?.melting?.["anomaly_score"] ?? 0).toFixed(2)} &gt; 0.78)
                 </h3>
                 <p className="text-xs text-foreground/80 mt-0.5">
-                  TFT Degradation Emergency Run triggered. Navigating to Live Workflow in <strong>{countdown ?? 5}s</strong>...
+                  TFT Degradation Emergency Run triggered. Real-time telemetry, model attributions, and prescriptive actions updated live.
                 </p>
               </div>
             </div>
-            <Link
-              to="/live-workflow"
-              className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-destructive-foreground shadow hover:bg-destructive/90 transition-all"
-            >
-              <span>View Live Workflow</span>
-              <ArrowRight className="size-4" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/analytics"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3.5 py-2 text-xs font-medium text-secondary-foreground shadow hover:bg-secondary/80 transition-all"
+              >
+                <span>Final Analytics</span>
+              </Link>
+              <Link
+                to="/live-workflow"
+                className="inline-flex items-center gap-2 rounded-lg bg-destructive px-3.5 py-2 text-xs font-bold text-destructive-foreground shadow hover:bg-destructive/90 transition-all"
+              >
+                <span>View Live Workflow</span>
+                <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
           </div>
         </Reveal>
       )}
@@ -166,7 +155,7 @@ function Dashboard() {
                 )}
                 {id === "molding" && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Permeability: <span className="font-mono font-semibold text-foreground">{Number(state?.["permeability"] ?? 118).toFixed(0)} AFS</span>
+                    Permeability: <span className="font-mono font-semibold text-foreground">{Number(state?.["permeability"] ?? 0.88).toFixed(2)} norm</span>
                   </p>
                 )}
                 {id === "quality" && (
@@ -229,9 +218,9 @@ function Dashboard() {
                 <LineChart data={history} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="t" tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} minTickGap={24} />
-                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} />
+                  <YAxis domain={["auto", "auto"]} label={{ value: "°C", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: "var(--color-muted-foreground)" } }} tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={chartTooltip} />
-                  <Line type="monotone" dataKey="temp" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="temp" name="Melt temperature (°C)" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -240,16 +229,16 @@ function Dashboard() {
 
         <Reveal>
           <div className="surface-panel p-6">
-            <h2 className="text-sm font-medium">Defect Rate Over Time</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Percent of castings rejected per day</p>
+            <h2 className="text-sm font-medium">Furnace Vibration Trace</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Shell vibration channel from the melting twin, g (RMS)</p>
             <div className="mt-4 h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={history} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="t" tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} minTickGap={24} />
-                  <YAxis tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} label={{ value: "g", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: "var(--color-muted-foreground)" } }} />
                   <Tooltip contentStyle={chartTooltip} cursor={{ fill: "var(--color-muted)", opacity: 0.3 }} />
-                  <Bar dataKey="vibration" fill="var(--color-chart-3)" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="vibration" name="Vibration (g)" fill="var(--color-chart-3)" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

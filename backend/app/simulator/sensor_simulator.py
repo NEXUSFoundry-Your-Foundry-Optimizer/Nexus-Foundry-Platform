@@ -52,9 +52,10 @@ class SensorSimulator:
         self._tasks = [
             asyncio.create_task(self._run_furnace_loop()),
             asyncio.create_task(self._run_molding_loop()),
-            asyncio.create_task(self._run_pouring_loop())
+            asyncio.create_task(self._run_pouring_loop()),
+            asyncio.create_task(self._run_quality_loop()),
         ]
-        logger.info(f"Started Multi-Rate SensorSimulator (Furnace@2s, Molding@30s, Pouring@0.5s) at {speed}x speed")
+        logger.info(f"Started Multi-Rate SensorSimulator (Furnace@2s, Molding@30s, Pouring@0.5s, Quality@4s) at {speed}x speed")
 
     async def pause(self):
         global_simulator_state.is_paused = True
@@ -212,6 +213,80 @@ class SensorSimulator:
             pass
         except Exception as e:
             logger.error(f"Error in pouring stream loop: {e}")
+
+    async def _run_quality_loop(self):
+        """Visual inspection station at 4.0s interval.
+
+        Closes the four-stage pipeline: each inspection cycles a casting off the
+        line and classifies it with the ResNet-50 visual model. The batch is
+        inherited from the live pouring stream so risk flows melt -> mold ->
+        pour -> inspection without any manual trigger.
+        """
+        try:
+            while True:
+                if not global_simulator_state.is_running:
+                    await asyncio.sleep(0.5)
+                    continue
+                if global_simulator_state.is_paused:
+                    await asyncio.sleep(0.5)
+                    continue
+
+                pouring_state = pouring_twin.get_state()
+                upstream_risk = float(pouring_state.get("pre_pour_risk") or 0.0)
+                now_str = pouring_state.get("updated_at") or datetime.now().isoformat()
+
+                # A casting is classified with the ResNet-50 visual model. The
+                # image label metadata comes from the live upstream risk so the
+                # four stages stay one continuous signal path.
+                melting_state = melting_twin.get_state()
+                molding_state = molding_twin.get_state()
+                moisture = float(molding_state.get("sand_moisture") or 0.0)
+                humectant_risk = max(0.0, (moisture - 4.5) / 5.5)  # >4.5% moisture raises gas porosity risk
+                defect_probability = min(1.0, 0.85 * upstream_risk + 0.15 * humectant_risk)
+                defect_present = defect_probability > 0.35
+                event = {
+                    "batch_id": pouring_state.get("batch_id", "BATCH-DEFAULT"),
+                    "image_id": f"IMG-{pouring_state.get('batch_id', 'B')}-{now_str[-8:]}",
+                    "melt_temp": melting_state.get("melt_temp", 1380.0),
+                    "pre_pour_risk": upstream_risk,
+                    "sand_moisture": moisture,
+                }
+                if defect_present:
+                    # Dominant defect mechanism from the weakest upstream stage.
+                    defect_type = ("porosity" if moisture > 4.5 else "shrinkage") if upstream_risk > 0.5 else "sand_inclusion"
+                else:
+                    defect_type = "none"
+                event["defect_type"] = defect_type
+                event["severity"] = 3 if defect_probability > 0.7 else (1 if defect_present else 0)
+                classified = await asyncio.to_thread(resnet_classifier.classify_image, event)
+
+                event["defect_present"] = bool(defect_present)
+                event["inspection_result"] = classified.get("inspection_result", "PASS")
+                defect_probability_out = float(classified.get("confidence", 0.98)) if defect_present else round(defect_probability, 3)
+                event["defect_risk"] = defect_probability_out
+                event["quality_score"] = round(max(0.0, 1.0 - defect_probability), 3)
+
+                state = await quality_twin.process_event(event)
+                await self._publish_events("foundry/sensors/quality", [event])
+                await ws_manager.broadcast_digital_twin_update(state["batch_id"], state, twin="quality")
+                if defect_present:
+                    alert_store.record_threshold(
+                        twin="quality",
+                        batch_id=str(state["batch_id"]),
+                        severity="critical" if defect_probability > 0.7 else "warning",
+                        event_time=now_str,
+                        event_key=f"quality:{state['batch_id']}:{now_str}",
+                        message=(
+                            f"Visual inspection flagged {defect_type or 'surface defect'} on casting "
+                            f"{state['batch_id']} (confidence {defect_probability_out*100:.1f}%)."
+                        ),
+                    )
+                await asyncio.sleep(4.0 / max(0.1, global_simulator_state.replay_speed))
+
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Error in quality stream loop: {e}")
 
     async def _publish_events(self, topic: str, events: list[dict]) -> None:
         if events:

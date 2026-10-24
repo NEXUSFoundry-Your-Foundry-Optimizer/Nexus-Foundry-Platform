@@ -20,16 +20,18 @@ export function TwinVisual({
   variant,
   className,
   label = "Loading 3D twin model",
+  live = null,
 }: {
   variant: SceneVariant;
   className?: string;
   label?: string;
+  live?: Record<string, unknown> | null;
 }) {
   return (
     <div className={cn("relative overflow-hidden rounded-xl border border-border bg-surface", className)}>
       <ClientOnly fallback={<Placeholder label={label} />}>
         <Suspense fallback={<Placeholder label={label} />}>
-          <Scene variant={variant} />
+          <Scene variant={variant} live={live} />
         </Suspense>
       </ClientOnly>
       <div className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-border bg-background/70 px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground backdrop-blur">

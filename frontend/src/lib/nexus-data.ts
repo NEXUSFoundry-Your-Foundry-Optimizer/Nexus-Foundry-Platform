@@ -11,7 +11,9 @@ export interface TwinMeta {
   comingSoon?: boolean;
   metricLabel: string;
   fields: { key: string; label: string; unit: string }[];
-  series: { key: string; label: string; color: string }[];
+  /** Chart series draw straight from the twin state; `field` is the state key
+   *  and `unit` is the engineering unit shown on the Y axis, tooltip and legend. */
+  series: { key: string; field: string; label: string; unit: string; color: string; percent?: boolean; fallback?: number }[];
 }
 
 export const TWINS: Record<TwinId, TwinMeta> = {
@@ -30,9 +32,9 @@ export const TWINS: Record<TwinId, TwinMeta> = {
       { key: "operating_state", label: "State", unit: "" },
     ],
     series: [
-      { key: "temp", label: "Temperature (°C)", color: "var(--color-chart-1)" },
-      { key: "power", label: "Power (kW)", color: "var(--color-chart-2)" },
-      { key: "vibration", label: "Vibration (g×10⁴)", color: "var(--color-chart-3)" },
+      { key: "temp", field: "melt_temp", label: "Melt temperature", unit: "°C", color: "var(--color-chart-1)", fallback: 1380 },
+      { key: "power", field: "power_kw", label: "Power draw", unit: "kW", color: "var(--color-chart-2)", fallback: 800 },
+      { key: "vibration", field: "vibration_g", label: "Vibration", unit: "g", color: "var(--color-chart-3)", fallback: 0.03 },
     ],
   },
   molding: {
@@ -43,14 +45,14 @@ export const TWINS: Record<TwinId, TwinMeta> = {
     metricLabel: "Sand moisture",
     fields: [
       { key: "sand_moisture", label: "Sand Moisture", unit: "%" },
-      { key: "permeability", label: "Permeability", unit: "AFS" },
+      { key: "permeability", label: "Permeability", unit: "norm" },
       { key: "green_strength", label: "Green Strength", unit: "kPa" },
       { key: "compactability", label: "Compactability", unit: "%" },
     ],
     series: [
-      { key: "temp", label: "Moisture (%×100)", color: "var(--color-chart-1)" },
-      { key: "power", label: "Permeability (AFS)", color: "var(--color-chart-2)" },
-      { key: "vibration", label: "Green Strength (kPa×10)", color: "var(--color-chart-3)" },
+      { key: "temp", field: "sand_moisture", label: "Sand moisture", unit: "%", color: "var(--color-chart-1)", fallback: 4.2 },
+      { key: "power", field: "permeability", label: "Permeability", unit: "norm", color: "var(--color-chart-2)", fallback: 0.88 },
+      { key: "vibration", field: "green_strength", label: "Green strength", unit: "kPa", color: "var(--color-chart-3)", fallback: 96 },
     ],
   },
   pouring: {
@@ -66,9 +68,9 @@ export const TWINS: Record<TwinId, TwinMeta> = {
       { key: "pre_pour_risk", label: "Defect Risk", unit: "%" },
     ],
     series: [
-      { key: "temp", label: "Pour Temp (°C)", color: "var(--color-chart-1)" },
-      { key: "power", label: "Fill Level (%)", color: "var(--color-chart-2)" },
-      { key: "vibration", label: "Pour Speed (m/s×100)", color: "var(--color-chart-3)" },
+      { key: "temp", field: "pour_temp", label: "Pour temperature", unit: "°C", color: "var(--color-chart-1)", fallback: 1445 },
+      { key: "power", field: "ladle_fill_pct", label: "Ladle fill", unit: "%", color: "var(--color-chart-2)", fallback: 85 },
+      { key: "vibration", field: "pour_speed", label: "Pour speed", unit: "m/s", color: "var(--color-chart-3)", fallback: 0.6 },
     ],
   },
   quality: {
@@ -79,14 +81,14 @@ export const TWINS: Record<TwinId, TwinMeta> = {
     comingSoon: true,
     metricLabel: "Defect probability",
     fields: [
-      { key: "defect_present", label: "Defect Present", unit: "" },
-      { key: "defect_type", label: "Defect Type", unit: "" },
-      { key: "severity", label: "Severity", unit: "" },
+      { key: "defect_risk", label: "Defect Risk", unit: "%" },
+      { key: "quality_score", label: "Quality Score", unit: "%" },
+      { key: "inspection_result", label: "Result", unit: "" },
     ],
     series: [
-      { key: "temp", label: "Defect Probability (%)", color: "var(--color-chart-1)" },
-      { key: "power", label: "Inspection Confidence (%)", color: "var(--color-chart-2)" },
-      { key: "vibration", label: "Surface Score", color: "var(--color-chart-3)" },
+      { key: "temp", field: "defect_risk", label: "Defect risk", unit: "%", color: "var(--color-chart-1)", percent: true, fallback: 0.02 },
+      { key: "power", field: "quality_score", label: "Quality score", unit: "%", color: "var(--color-chart-2)", percent: true, fallback: 0.98 },
+      { key: "vibration", field: "severity", label: "Severity", unit: "", color: "var(--color-chart-3)", fallback: 0 },
     ],
   },
 };

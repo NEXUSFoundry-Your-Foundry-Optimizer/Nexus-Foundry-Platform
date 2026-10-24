@@ -31,6 +31,8 @@ class QualityTwin(BaseDigitalTwin):
             self.current_state["inspection_result"] = str(event["inspection_result"])
         if "defect_risk" in event:
             self.current_state["defect_risk"] = float(event["defect_risk"])
+        if "quality_score" in event:
+            self.current_state["quality_score"] = float(event["quality_score"])
         if "severity" in event:
             self.current_state["severity"] = int(event["severity"])
         if "image_id" in event:

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { TwinId } from "./nexus-data";
+import { TWINS, type TwinId } from "./nexus-data";
 
 export interface LiveState {
   batch_id: string;
@@ -8,6 +8,7 @@ export interface LiveState {
 }
 
 export interface LivePoint {
+  /** Elapsed replay time, formatted mm:ss — the X axis unit of every live chart. */
   t: string;
   temp: number;
   power: number;
@@ -34,17 +35,32 @@ async function getJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/** Chart slot order maps onto each twin's `meta.series` definition. */
+const POINT_KEYS = ["temp", "power", "vibration"] as const;
+
+/**
+ * Project one raw twin state onto the chart series of that twin.
+ * Values are read in their native engineering units (no artificial rescaling)
+ * using the `field` + `unit` metadata defined in nexus-data.
+ */
 function toPoint(twin: TwinId, state: LiveState): LivePoint {
-  const value = (key: string, fallback = 0) => Number(state[key] ?? fallback);
-  const mapping: [number, number, number] = {
-    melting: [value("melt_temp", 1380), value("power_kw", 800), value("vibration_g", 0.03) * 10000],
-    molding: [value("sand_moisture", 4.2) * 100, value("permeability", 118), value("green_strength", 96) / 10],
-    pouring: [value("pour_temp", 1445), value("ladle_fill_pct", 88), value("pour_speed", 0.85) * 100],
-    quality: [value("defect_risk", 0.1) * 100, value("quality_score", 0.95) * 100, value("severity", 0)],
-  }[twin] as [number, number, number];
-  
-  const timeStr = state.updated_at ? new Date(state.updated_at).toLocaleTimeString("en-GB", { hour12: false }).slice(3) : new Date().toLocaleTimeString("en-GB", { hour12: false }).slice(3);
-  return { t: timeStr, temp: Number(mapping[0].toFixed(2)), power: Number(mapping[1].toFixed(2)), vibration: Number(mapping[2].toFixed(2)) };
+  const meta = TWINS[twin];
+  const point = { t: timestampLabel(state) } as LivePoint;
+  meta.series.forEach((series, index) => {
+    const slot = POINT_KEYS[index] ?? "temp";
+    let value = Number(state[series.field] ?? series.fallback ?? 0);
+    if (!Number.isFinite(value)) value = 0;
+    if (series.percent) value *= 100;
+    const decimals = series.unit === "°C" || series.unit === "kW" || series.unit === "kPa" ? 1 : series.unit === "norm" ? 2 : 3;
+    point[slot] = Number(value.toFixed(decimals));
+  });
+  return point;
+}
+
+function timestampLabel(state: LiveState): string {
+  const source = state.updated_at ? new Date(state.updated_at) : new Date();
+  if (Number.isNaN(source.getTime())) return "--:--";
+  return source.toLocaleTimeString("en-GB", { hour12: false }).slice(3);
 }
 
 export function useLiveTwin(twin: TwinId) {

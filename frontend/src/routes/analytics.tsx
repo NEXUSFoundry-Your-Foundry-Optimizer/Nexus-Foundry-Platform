@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
 import { StatusPill } from "@/components/site/StatusPill";
@@ -26,9 +27,30 @@ export const Route = createFileRoute("/analytics")({
 function Analytics() {
   const navigate = useNavigate();
   const focusAlert = useNexus((s) => s.focusAlert);
-  const { data: alerts } = useLiveCollection<LiveAlert[]>("/api/v1/alerts/active");
+  const { data: remoteAlerts } = useLiveCollection<LiveAlert[]>("/api/v1/alerts");
   const { data: batches } = useLiveCollection<LiveBatch[]>("/api/batches");
   const { data: shap } = useLiveCollection<{ prediction: string; probability: number; recommendation: string }>("/api/analytics/shap", 10000);
+
+  // Persistent accumulated alert state - once an alert appears, it never disappears and new alerts append
+  const [persistentAlerts, setPersistentAlerts] = useState<LiveAlert[]>([]);
+
+  useEffect(() => {
+    if (remoteAlerts && remoteAlerts.length > 0) {
+      setPersistentAlerts((prev) => {
+        const map = new Map<string, LiveAlert>();
+        // Keep existing accumulated alerts
+        prev.forEach((alert) => {
+          map.set(alert.id || `${alert.twin}-${alert.batch}-${alert.time}`, alert);
+        });
+        // Add new alerts
+        remoteAlerts.forEach((alert) => {
+          const key = alert.id || `${alert.twin}-${alert.batch}-${alert.time}`;
+          map.set(key, alert);
+        });
+        return Array.from(map.values());
+      });
+    }
+  }, [remoteAlerts]);
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
@@ -59,27 +81,35 @@ function Analytics() {
                 </tr>
               </thead>
               <tbody>
-                {(alerts ?? []).map((a) => (
-                  <tr key={a.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/40">
-                    <td className="px-6 py-4">{TWINS[a.twin].name}</td>
-                    <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{a.batch}</td>
-                    <td className="px-6 py-4">
-                      <StatusPill status={a.severity} />
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{a.time}</td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => {
-                          focusAlert(a.id);
-                          navigate({ to: "/twins/$twin", params: { twin: a.twin } });
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs text-primary transition-opacity hover:opacity-70"
-                      >
-                        View <ArrowRight className="size-3.5" />
-                      </button>
+                {persistentAlerts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-xs text-muted-foreground">
+                      No alerts recorded yet. Trigger an anomaly or replay to view persistent alerts.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  persistentAlerts.map((a) => (
+                    <tr key={a.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/40 transition-colors">
+                      <td className="px-6 py-4 font-medium">{TWINS[a.twin]?.name ?? a.twin}</td>
+                      <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{a.batch}</td>
+                      <td className="px-6 py-4">
+                        <StatusPill status={a.severity} />
+                      </td>
+                      <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{a.time}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => {
+                            focusAlert(a.id);
+                            navigate({ to: "/twins/$twin", params: { twin: a.twin } });
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs text-primary transition-opacity hover:opacity-70"
+                        >
+                          View <ArrowRight className="size-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

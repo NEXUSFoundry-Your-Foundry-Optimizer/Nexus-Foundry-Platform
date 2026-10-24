@@ -150,18 +150,8 @@ function RootComponent() {
   );
 }
 
-/** Routes an operator to the dashboard as soon as the backend confirms an anomaly. */
+/** Global alert state listener - does not interrupt user navigation or redirect away from analytics */
 function AnomalyRouteController() {
-  const { data } = useLiveDashboard();
-  const navigate = useNavigate();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isAnomaly = Number(data?.twins?.melting?.["anomaly_score"] ?? 0) > 0.78;
-
-  useEffect(() => {
-    if (isAnomaly && pathname !== "/dashboard" && pathname !== "/live-workflow") {
-      navigate({ to: "/dashboard" });
-    }
-  }, [isAnomaly, navigate, pathname]);
-
+  // Navigation is purely user-controlled; no auto-redirects to ensure operator stays on their chosen page (e.g., Final Analytics)
   return null;
 }

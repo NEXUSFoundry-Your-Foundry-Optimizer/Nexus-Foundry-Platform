@@ -3,6 +3,7 @@ import ast
 from typing import Dict, Any
 from backend.app.digital_twins.base import BaseDigitalTwin
 from backend.app.db.redis import redis_manager
+from backend.app.alerts import alert_store
 from backend.app.ml.xgboost_model import xgboost_model
 from backend.app.ml.shap_explainer import shap_explainer
 from backend.app.simulator.dataset_loader import dataset_loader
@@ -74,6 +75,16 @@ class PouringTwin(BaseDigitalTwin):
         })
         prediction = xgboost_model.predict(features)
         explanation = shap_explainer.explain(batch_id, features)
+
+        if float(prediction.get("defect_probability") or 0.0) > 0.5:
+            alert_store.record_threshold(
+                twin="pouring",
+                batch_id=batch_id,
+                severity="critical" if float(prediction.get("defect_probability") or 0.0) > 0.7 else "warning",
+                message=f"Pre-pour defect risk elevated to {float(prediction.get('defect_probability') or 0.0)*100:.1f}% (Top driver: {explanation.get('top_risk_driver', 'Pour Temp')})",
+                event_time=str(warning.get("timestamp", datetime.now().isoformat())),
+                event_key=f"pouring:{batch_id}:{warning.get('timestamp', datetime.now().isoformat())}",
+            )
 
         self.current_state.update({
             "pre_pour_risk": prediction["defect_probability"],

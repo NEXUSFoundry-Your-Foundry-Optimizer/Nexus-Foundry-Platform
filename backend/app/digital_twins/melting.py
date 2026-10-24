@@ -4,6 +4,7 @@ from collections import deque
 from typing import Dict, Any
 from backend.app.digital_twins.base import BaseDigitalTwin
 from backend.app.db.redis import redis_manager
+from backend.app.alerts import alert_store
 from backend.app.ml.lstm_autoencoder import lstm_autoencoder
 from backend.app.ml.tft import tft_model
 from backend.app.simulator.dataset_loader import dataset_loader
@@ -100,6 +101,15 @@ class MeltingTwin(BaseDigitalTwin):
             [{"features": item} for item in self.sensor_history],
         )
         is_anomaly = bool(detection.get("is_anomaly", False))
+        if is_anomaly:
+            alert_store.record_threshold(
+                twin="melting",
+                batch_id=str(self.current_state.get("batch_id", "BATCH-DEFAULT")),
+                severity="critical",
+                message=f"Critical Anomaly: Reconstruction MSE {detection.get('anomaly_score', 0.0):.2f} exceeds threshold 0.78",
+                event_time=timestamp,
+                event_key=f"melting:{self.current_state.get('batch_id')}:{timestamp}",
+            )
         self.current_state.update({
             "anomaly_score": detection.get("anomaly_score", 0.0),
             "anomaly_flag": is_anomaly,

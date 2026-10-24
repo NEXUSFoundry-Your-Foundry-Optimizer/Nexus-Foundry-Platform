@@ -296,6 +296,15 @@ backend/
 
 ---
 
+## 👥 Core Contributors & Team Responsibilities
+
+| Contributor | Focus Areas | Key Technical Contributions |
+| :--- | :--- | :--- |
+| **Subiksha M V** | Pipeline Integration & AI/ML Engineering | • **End-to-End Dynamic Integration:** Orchestrated cross-stage state synchronization linking Melting $\rightarrow$ Molding $\rightarrow$ Pouring $\rightarrow$ Quality twins.<br>• **Deep Learning & Predictive Analytics:** Implemented and calibrated the 4-tier ML suite (Keras LSTM-AE anomaly scoring with $\tau=0.78$, PyTorch Temporal Fusion Transformer quantile forecaster, XGBoost multi-defect classifier, and PINN transient heat conduction).<br>• **Explainability & Workflows:** Developed real-time TreeSHAP feature attribution engine ($<10\text{ ms}$) and the automated 11-step cross-stage execution pipeline. |
+| **Harinie S V** | Backend Gateway & System Infrastructure | • **FastAPI Gateway & Streaming Architecture:** Architected high-concurrency async REST APIs and bi-directional 2 Hz WebSocket broadcasting pipelines.<br>• **Deployment & Infrastructure:** Configured Docker Compose multi-service containerization, Mosquitto MQTT broker, OpenTelemetry collectors, and Grafana observability dashboards.<br>• **Data Simulation & Persistence:** Developed high-throughput dataset replay engines and multi-store database persistence across InfluxDB 2.x, PostgreSQL, and Redis. |
+
+---
+
 ## 📄 License & Attribution
 
 Designed and developed for **Project NEXUS (Phase 2 Milestone)**. All rights reserved. Built with pride for advanced manufacturing, sustainable metallurgy, and industrial artificial intelligence.

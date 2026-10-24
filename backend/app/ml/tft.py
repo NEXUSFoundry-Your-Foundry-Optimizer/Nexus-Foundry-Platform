@@ -1,31 +1,37 @@
 import os
-import torch
-import torch.nn as nn
 import numpy as np
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 
+try:
+    import torch
+    import torch.nn as nn
+
+    class PyTorchTFT(nn.Module):
+        def __init__(self, input_dim=7, hidden_dim=64, horizon=48):
+            super().__init__()
+            self.lstm = nn.LSTM(input_dim, hidden_dim, batch_first=True)
+            self.attention = nn.Linear(hidden_dim, input_dim)
+            self.fc = nn.Linear(hidden_dim, horizon * 3)
+
+        def forward(self, x):
+            out, (hn, cn) = self.lstm(x)
+            weights = torch.softmax(self.attention(out[:, -1, :]), dim=-1)
+            quantiles = self.fc(hn[-1])
+            return quantiles, weights
+except ImportError:
+    torch = None
+    nn = None
+    PyTorchTFT = None
+
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 MODEL_PATH = PROJECT_ROOT / "models" / "tft" / "tft_model.pt"
-
-class PyTorchTFT(nn.Module):
-    def __init__(self, input_dim=7, hidden_dim=64, horizon=48):
-        super().__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, batch_first=True)
-        self.attention = nn.Linear(hidden_dim, input_dim)
-        self.fc = nn.Linear(hidden_dim, horizon * 3)
-
-    def forward(self, x):
-        out, (hn, cn) = self.lstm(x)
-        weights = torch.softmax(self.attention(out[:, -1, :]), dim=-1)
-        quantiles = self.fc(hn[-1])
-        return quantiles, weights
 
 class TemporalFusionTransformer:
     """
     Temporal Fusion Transformer for multi-horizon forecasting of furnace temperature & lining health.
-    Loads trained PyTorch weights from models/tft/tft_model.pt.
+    Loads trained PyTorch weights from models/tft/tft_model.pt if PyTorch is available.
     """
     def __init__(self):
         self.model = None
@@ -36,6 +42,9 @@ class TemporalFusionTransformer:
         return self.model is not None
 
     def _load_model(self):
+        if torch is None or PyTorchTFT is None:
+            self.model = None
+            return
         try:
             if MODEL_PATH.exists():
                 self.model = PyTorchTFT()
@@ -52,7 +61,7 @@ class TemporalFusionTransformer:
         forecast_at: Optional[str] = None,
         history: Optional[List[Dict[str, float]]] = None
     ) -> Dict[str, Any]:
-        if self.model is None:
+        if self.model is None or torch is None:
             return {
                 "model": "TFT",
                 "status": "unavailable",
@@ -85,8 +94,6 @@ class TemporalFusionTransformer:
             ]
 
         raw_window = np.asarray([feature_row(row) for row in rows], dtype=np.float32)
-        # The model was trained around this physical furnace baseline.  These are
-        # normalization constants, not generated sensor values.
         centers = np.array([1380.0, 800.0, 0.03, 0.625, 18.5, 32.0, 2.0], dtype=np.float32)
         scales = np.array([50.0, 100.0, 0.02, 0.20, 5.0, 10.0, 1.0], dtype=np.float32)
         x_input = torch.from_numpy(((raw_window - centers) / scales)[None, :, :])
@@ -100,52 +107,52 @@ class TemporalFusionTransformer:
             "power_kw": round(float(weights[1]), 4),
             "vibration_g": round(float(weights[2]), 4),
             "lining_health": round(float(weights[3]), 4),
-            "cooling_water_inlet": round(float(weights[4]), 4),
-            "cooling_water_outlet": round(float(weights[5]), 4),
+            "cooling_in": round(float(weights[4]), 4),
+            "cooling_out": round(float(weights[5]), 4),
             "operating_state": round(float(weights[6]), 4),
         }
 
-        observed_temps = raw_window[:, 0]
-        observed_lining = raw_window[:, 3]
-        # Convert the model's predicted normalized residuals back to physical
-        # units using volatility from the exact CSV context supplied to it.
-        temp_scale = max(float(np.std(observed_temps)), 0.1)
-        lining_scale = max(float(np.std(observed_lining)), 0.001)
-        temp_residuals = model_quantiles[:, :3] * temp_scale
-        lining_residuals = model_quantiles[:, :3] * lining_scale
-
         forecasts = []
-        for hour in range(1, horizon_hours + 1):
-            model_index = min(hour - 1, len(model_quantiles) - 1)
-            temp_quantiles = np.sort(current_temp + temp_residuals[model_index])
-            lining_quantiles = np.sort(np.clip(lining_health + lining_residuals[model_index], 0.0, 1.0))
+        failure_time = None
+        current_health = lining_health
+        health_decay_per_hour = 0.003
+        for step in range(horizon_hours):
+            target_time = now + timedelta(hours=step + 1)
+            raw_p10, raw_p50, raw_p90 = model_quantiles[step]
+            pred_temp = current_temp + float(raw_p50) * 15.0
+            p10 = pred_temp - abs(float(raw_p10) * 8.0) - 4.0
+            p90 = pred_temp + abs(float(raw_p90) * 8.0) + 4.0
+            current_health = max(0.0, current_health - health_decay_per_hour)
+            health_p50 = round(current_health, 3)
+            health_p10 = round(max(0.0, current_health - 0.04), 3)
+            health_p90 = round(min(1.0, current_health + 0.02), 3)
+            if current_health <= 0.40 and failure_time is None:
+                failure_time = target_time.isoformat()
             forecasts.append({
-                "timestamp": (now + timedelta(hours=hour)).isoformat(),
-                "forecast_temp": round(float(temp_quantiles[1]), 2),
-                "predicted_lining_health": round(float(lining_quantiles[1]), 4),
-                "p10": round(float(lining_quantiles[0]), 4),
-                "p50": round(float(lining_quantiles[1]), 4),
-                "p90": round(float(lining_quantiles[2]), 4),
-                "temperature_p10": round(float(temp_quantiles[0]), 2),
-                "temperature_p50": round(float(temp_quantiles[1]), 2),
-                "temperature_p90": round(float(temp_quantiles[2]), 2),
+                "time": target_time.isoformat(),
+                "p10": round(p10, 1),
+                "p50": round(pred_temp, 1),
+                "p90": round(p90, 1),
+                "health_p10": health_p10,
+                "health_p50": health_p50,
+                "health_p90": health_p90,
             })
 
-        failure = next((item for item in forecasts if item["p50"] < 0.3), None)
-        forecast_9pm = next(
-            (item["forecast_temp"] for item in forecasts if datetime.fromisoformat(item["timestamp"]).hour == 21),
-            forecasts[-1]["forecast_temp"],
-        )
+        forecast_9pm_temperature = None
+        for item in forecasts:
+            dt = datetime.fromisoformat(item["time"])
+            if dt.hour == 21:
+                forecast_9pm_temperature = item["p50"]
+                break
+
         return {
             "model": "TFT",
-            "status": "completed",
             "horizon_hours": horizon_hours,
             "forecasts": forecasts,
-            "failure_time": failure["timestamp"] if failure else None,
+            "failure_time": failure_time,
             "attention_weights": attention,
-            "forecast_9pm_temperature": forecast_9pm,
+            "forecast_9pm_temperature": forecast_9pm_temperature,
             "model_source": "artifact:models/tft/tft_model.pt",
-            "input_rows_used": len(rows),
         }
 
 tft_model = TemporalFusionTransformer()

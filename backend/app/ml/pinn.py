@@ -1,34 +1,40 @@
 import os
-import torch
-import torch.nn as nn
 import numpy as np
 from typing import Dict, Any
 from pathlib import Path
 from backend.app.simulator.dataset_loader import dataset_loader
+
+try:
+    import torch
+    import torch.nn as nn
+
+    class HeatEquationPINN(nn.Module):
+        def __init__(self, in_features=4, hidden_features=64, out_features=3):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(in_features, hidden_features),
+                nn.Tanh(),
+                nn.Linear(hidden_features, hidden_features),
+                nn.Tanh(),
+                nn.Linear(hidden_features, out_features)
+            )
+
+        def forward(self, x):
+            return self.net(x)
+except ImportError:
+    torch = None
+    nn = None
+    HeatEquationPINN = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 MODEL_PATH = PROJECT_ROOT / "models" / "pinn" / "pinn_heat_equation.pt"
 if not MODEL_PATH.exists():
     MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "pinn" / "pinn_heat_equation.pt"
 
-class HeatEquationPINN(nn.Module):
-    def __init__(self, in_features=4, hidden_features=64, out_features=3):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(in_features, hidden_features),
-            nn.Tanh(),
-            nn.Linear(hidden_features, hidden_features),
-            nn.Tanh(),
-            nn.Linear(hidden_features, out_features)
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
 class PINNModel:
     """
     Physics-Informed Neural Network (PINN) for heat transfer & thermal field simulation.
-    Loads trained PyTorch weights from models/pinn/pinn_heat_equation.pt.
+    Loads trained PyTorch weights from models/pinn/pinn_heat_equation.pt if PyTorch is available.
     """
     def __init__(self):
         self.model = None
@@ -39,6 +45,9 @@ class PINNModel:
         return self.model is not None
 
     def _load_model(self):
+        if torch is None or HeatEquationPINN is None:
+            self.model = None
+            return
         try:
             if MODEL_PATH.exists():
                 self.model = HeatEquationPINN()
@@ -53,7 +62,6 @@ class PINNModel:
         pour_speed = float(parameters.get("pour_speed", 0.85))
         sand_moisture = float(parameters.get("sand_moisture", 4.2))
 
-        # Load pinn_X.npy and pinn_y.npy if available
         try:
             pinn_grid = dataset_loader.load_npy("pinn_X.npy")
             grid_shape = list(pinn_grid.shape)
@@ -64,8 +72,7 @@ class PINNModel:
 
         cooling_rate = (pour_temp - 600.0) / 120.0
 
-        # Evaluate PyTorch PINN model forward pass if available
-        if self.model is not None:
+        if self.model is not None and torch is not None:
             try:
                 x_tensor = torch.tensor([[melt_temp, pour_temp, pour_speed, sand_moisture]], dtype=torch.float32)
                 with torch.no_grad():

@@ -7,16 +7,22 @@ const frontendDir = path.resolve(__dirname, "..");
 
 async function generateHtml() {
   const distDir = path.resolve(frontendDir, "dist");
-  const clientDir = path.resolve(frontendDir, "dist/client");
   const fallbackHtmlPath = path.resolve(frontendDir, "index.html");
 
-  // 1. If dist/client exists, copy all its contents (assets, images, etc.) into dist/
-  if (fs.existsSync(clientDir)) {
-    try {
-      fs.cpSync(clientDir, distDir, { recursive: true });
-      console.log("Flattened dist/client assets into dist/");
-    } catch (err) {
-      console.warn("Failed flattening dist/client:", err.message);
+  // 1. Copy all client assets from .output/public, dist/client, etc. into dist/
+  const sources = [
+    path.resolve(frontendDir, ".output/public"),
+    path.resolve(frontendDir, "dist/client"),
+    path.resolve(frontendDir, ".vercel/output/static"),
+  ];
+  for (const src of sources) {
+    if (fs.existsSync(src)) {
+      try {
+        fs.cpSync(src, distDir, { recursive: true });
+        console.log(`Copied assets from ${src} into dist/`);
+      } catch (err) {
+        console.warn(`Failed copying from ${src}:`, err.message);
+      }
     }
   }
 

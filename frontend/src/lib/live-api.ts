@@ -25,7 +25,12 @@ export function formatLiveValue(key: string, value: unknown): string {
   return String(value);
 }
 
-export const API_URL = (import.meta.env["VITE_API_URL"] ?? "http://localhost:8000").replace(/\/$/, "");
+export const API_URL = (
+  import.meta.env["VITE_API_URL"] ||
+  (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+    ? "https://nexus-foundry-5zga.onrender.com"
+    : "http://localhost:8000")
+).replace(/\/$/, "");
 const WS_URL = API_URL.replace(/^http/, "ws");
 
 async function getJson<T>(path: string): Promise<T> {

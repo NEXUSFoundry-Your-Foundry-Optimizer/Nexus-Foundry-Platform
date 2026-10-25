@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "node -e \"const fs=require('fs'),p='node_modules/nitro/dist/vite.mjs';if(fs.existsSync(p)){let s=fs.readFileSync(p,'utf8');s=s.replace('this.meta.rolldownVersion','this?.meta?.rolldownVersion');fs.writeFileSync(p,s);}\" && vite build && node -e \"const fs=require('fs');const src=['.vercel/output/static','.output/public'].find(d=>fs.existsSync(d));if(src){fs.cpSync(src,'dist',{recursive:true});}\" && node scripts/prerender.mjs",
+    "build": "node -e \"const fs=require('fs'),p='node_modules/nitro/dist/vite.mjs';if(fs.existsSync(p)){let s=fs.readFileSync(p,'utf8');s=s.replace('this.meta.rolldownVersion','this?.meta?.rolldownVersion');fs.writeFileSync(p,s);}\" && vite build && node scripts/prerender.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",

@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "node -e \"const fs=require('fs'),p='node_modules/nitro/dist/vite.mjs';if(fs.existsSync(p)){let s=fs.readFileSync(p,'utf8');s=s.replace('this.meta.rolldownVersion','this?.meta?.rolldownVersion');fs.writeFileSync(p,s);}\" && vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "postinstall": "node -e \"const fs=require('fs'),p='node_modules/nitro/dist/vite.mjs';if(fs.existsSync(p)){let s=fs.readFileSync(p,'utf8');s=s.replace('this.meta.rolldownVersion','this?.meta?.rolldownVersion');fs.writeFileSync(p,s);}\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

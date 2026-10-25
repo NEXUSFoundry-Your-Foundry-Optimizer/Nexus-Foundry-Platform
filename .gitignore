@@ -9,9 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
-!frontend/dist/
 dist-ssr
 .output
+.vercel
 .vinxi
 .tanstack/**
 .nitro
@@ -43,11 +43,17 @@ __pycache__/
 htmlcov/
 
 # Large dataset files exceeding GitHub 100MB limit
-Datasets/furnace_sensor.csv
 Datasets/*.csv
 Datasets/*.npy
-!Datasets/material_properties.csv
+!Datasets/environmental.csv
+!Datasets/furnace_sensor.csv
 !Datasets/geometry_metadata.csv
+!Datasets/inspection_labels.csv
+!Datasets/material_properties.csv
+!Datasets/molding_sensor.csv
+!Datasets/pinn_X.npy
+!Datasets/pouring_sensor.csv
+!Datasets/production_master.csv
 !Datasets/xgboost_features.csv
 
 

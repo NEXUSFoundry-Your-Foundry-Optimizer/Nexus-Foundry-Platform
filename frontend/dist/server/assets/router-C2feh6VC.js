@@ -124,7 +124,7 @@ function formatLiveValue(key, value) {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
 }
-const API_URL = (__vite_import_meta_env__["VITE_API_URL"] ?? "http://localhost:8000").replace(/\/$/, "");
+const API_URL = (__vite_import_meta_env__["VITE_API_URL"] ?? "https://nexus-foundry-5zga.onrender.com").replace(/\/$/, "");
 const WS_URL = API_URL.replace(/^http/, "ws");
 async function getJson(path) {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;

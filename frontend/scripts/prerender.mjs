@@ -46,6 +46,12 @@ async function generateHtml() {
     return;
   }
 
+  // Ensure visiting /index.html directly normalizes to / so TanStack Router does not show blank
+  const normalizeScript = `<script>if(window.location.pathname.endsWith("/index.html")){const target=(window.location.pathname.replace(/\\/index\\.html$/,"")||"/")+window.location.search+window.location.hash;window.history.replaceState(null,"",target);}</script>`;
+  if (!html.includes('pathname.endsWith("/index.html")')) {
+    html = html.replace("<head>", "<head>" + normalizeScript);
+  }
+
   // 3. Write index.html to all possible deployment targets
   const targets = [
     path.resolve(frontendDir, "dist/index.html"),

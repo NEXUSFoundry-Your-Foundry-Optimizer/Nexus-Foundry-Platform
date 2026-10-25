@@ -76,26 +76,26 @@ Operator Dashboard & RAG Assistant
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
-│                                APPLICATION LAYER                                 │
-│  React 18 Dashboard • Three.js 3D Twins • SHAP Waterfalls • Real-Time Alert Logs │
+│                                APPLICATION LAYER                                     │
+│  React 18 Dashboard • Three.js 3D Twins • SHAP Waterfalls • Real-Time Alert Logs     │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│                               INTELLIGENCE LAYER                                  │
-│  TreeSHAP Fast Attributions • RAG Cognitive Assistant (Llama 3 + ChromaDB)       │
+│                               INTELLIGENCE LAYER                                     │
+│  TreeSHAP Fast Attributions • RAG Cognitive Assistant (Llama 3 + ChromaDB)           │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│                               AI / ANALYTICS LAYER                               │
-│  LSTM-AE (Anomaly) • TFT (Degradation) • XGBoost (Defects) • PINN (Physics)      │
+│                               AI / ANALYTICS LAYER                                   │
+│  LSTM-AE (Anomaly) • TFT (Degradation) • XGBoost (Defects) • PINN (Physics)          │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│                               DIGITAL TWIN LAYER                                 │
-│  Melting Twin (Furnace) ──> Molding Twin (Sand) ──> Pouring Twin ──> Quality Twin│
+│                               DIGITAL TWIN LAYER                                     │
+│  Melting Twin (Furnace) ──> Molding Twin (Sand) ──> Pouring Twin ──> Quality Twin    │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│                                DATA STORAGE LAYER                                │
-│  InfluxDB (Time-Series) • PostgreSQL (Lineage) • Redis (State) • File Storage    │
+│                                DATA STORAGE LAYER                                    │
+│  InfluxDB (Time-Series) • PostgreSQL (Lineage) • Redis (State) • File Storage        │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│                                 INGESTION LAYER                                  │
-│  FastAPI Async Gateway • WebSocket Broadcast (2 Hz) • MQTT Broker • Kafka Bridge │
+│                                 INGESTION LAYER                                      │
+│  FastAPI Async Gateway • WebSocket Broadcast (2 Hz) • MQTT Broker • Kafka Bridge     │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
-│                                  PHYSICAL / EDGE                                 │
-│  Optical Pyrometers • Accelerometers • Power CTs • High-Resolution Line Cameras  │
+│                                  PHYSICAL / EDGE                                     │
+│  Optical Pyrometers • Accelerometers • Power CTs • High-Resolution Line Cameras      │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 

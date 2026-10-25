@@ -20,6 +20,7 @@ async function generateHtml() {
 
     const targets = [
       path.resolve(frontendDir, "dist/index.html"),
+      path.resolve(frontendDir, "index.html"),
       path.resolve(frontendDir, ".vercel/output/static/index.html"),
       path.resolve(frontendDir, ".output/public/index.html"),
     ];
@@ -30,6 +31,14 @@ async function generateHtml() {
         fs.writeFileSync(target, html, "utf8");
         console.log(`Generated ${target} (${html.length} bytes)`);
       }
+    }
+
+    // Also mirror dist/assets to frontend/assets in case Publish Directory is root
+    const distAssets = path.resolve(frontendDir, "dist/assets");
+    const rootAssets = path.resolve(frontendDir, "assets");
+    if (fs.existsSync(distAssets) && !fs.existsSync(rootAssets)) {
+      fs.cpSync(distAssets, rootAssets, { recursive: true });
+      console.log("Mirrored dist/assets to frontend/assets");
     }
   } catch (err) {
     console.error("Prerender failed:", err);

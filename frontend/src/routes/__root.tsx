@@ -17,8 +17,24 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { Toaster } from "@/components/ui/sonner";
 import { API_URL, useLiveDashboard } from "@/lib/live-api";
+import { Landing } from "./index";
 
 function NotFoundComponent() {
+  const routerState = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (routerState === "/index.html" || routerState.endsWith("/index.html")) {
+      navigate({ to: "/", replace: true });
+    }
+  }, [routerState, navigate]);
+
+  if (routerState === "/index.html" || routerState.endsWith("/index.html")) {
+    return <Landing />;
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">

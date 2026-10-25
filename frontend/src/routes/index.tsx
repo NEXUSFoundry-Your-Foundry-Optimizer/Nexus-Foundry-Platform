@@ -126,7 +126,7 @@ function WaveField() {
   );
 }
 
-function Landing() {
+export function Landing() {
   return (
     <div>
       {/* HERO */}

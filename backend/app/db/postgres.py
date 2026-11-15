@@ -58,6 +58,45 @@ class SHAPExplanationRecord(Base):
     feature_attributions = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class QualityInspectionRecord(Base):
+    __tablename__ = "quality_inspections"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    batch_id = Column(String, index=True)
+    image_path = Column(String, nullable=True)
+    defect_present = Column(Boolean)
+    confidence = Column(Float)
+    defect_type = Column(String)
+    raw_score = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class RetrainingQueueRecord(Base):
+    __tablename__ = "retraining_queue"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    image_path = Column(String)
+    predicted_label = Column(String)
+    actual_label = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+async def save_quality_inspection(result: dict):
+    try:
+        async with AsyncSessionLocal() as session:
+            record = QualityInspectionRecord(
+                batch_id=str(result.get("batch_id", "")),
+                image_path=str(result.get("image_path", "")),
+                defect_present=bool(result.get("defect_present", False)),
+                confidence=float(result.get("confidence", 0.0)),
+                defect_type=str(result.get("defect_type", "none")),
+                raw_score=float(result.get("raw_score", 0.0)),
+                created_at=datetime.utcnow()
+            )
+            session.add(record)
+            await session.commit()
+            logger.info(f"Saved quality inspection record for batch {result.get('batch_id')}")
+            return record.id
+    except Exception as e:
+        logger.warning(f"Could not save quality inspection to PostgreSQL: {e}")
+        return None
+
 async def init_postgres():
     try:
         async with engine.begin() as conn:

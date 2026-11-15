@@ -7,27 +7,6 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Virtual environments
-.venv/
-
-# Large ML model files (use Git LFS or external storage)
-models/*.h5
-models/*.keras
-models/*.pkl
-models/*.pt
-models/*.pth
-backend/models/*.h5
-backend/models/*.keras
-backend/models/*.pkl
-backend/models/*.pt
-backend/models/*.pth
-
-# Temp files
-temp_images/
-exported_screenshots/
-NEXUS_Foundry_Screenshots.zip
-NEXUS_Foundry_Platform_Detailed_Report.pdf
-
 node_modules
 dist
 dist-ssr
@@ -38,51 +17,9 @@ dist-ssr
 .nitro
 *.local
 
-# Virtual environments
-.venv/
-
-# Large ML model files (use Git LFS or external storage)
-models/*.h5
-models/*.keras
-models/*.pkl
-models/*.pt
-models/*.pth
-backend/models/*.h5
-backend/models/*.keras
-backend/models/*.pkl
-backend/models/*.pt
-backend/models/*.pth
-
-# Temp files
-temp_images/
-exported_screenshots/
-NEXUS_Foundry_Screenshots.zip
-NEXUS_Foundry_Platform_Detailed_Report.pdf
-
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
-
-# Virtual environments
-.venv/
-
-# Large ML model files (use Git LFS or external storage)
-models/*.h5
-models/*.keras
-models/*.pkl
-models/*.pt
-models/*.pth
-backend/models/*.h5
-backend/models/*.keras
-backend/models/*.pkl
-backend/models/*.pt
-backend/models/*.pth
-
-# Temp files
-temp_images/
-exported_screenshots/
-NEXUS_Foundry_Screenshots.zip
-NEXUS_Foundry_Platform_Detailed_Report.pdf
 
 # Editor directories and files
 .vscode/*
@@ -95,27 +32,6 @@ NEXUS_Foundry_Platform_Detailed_Report.pdf
 *.sln
 *.sw?
 
-# Virtual environments
-.venv/
-
-# Large ML model files (use Git LFS or external storage)
-models/*.h5
-models/*.keras
-models/*.pkl
-models/*.pt
-models/*.pth
-backend/models/*.h5
-backend/models/*.keras
-backend/models/*.pkl
-backend/models/*.pt
-backend/models/*.pth
-
-# Temp files
-temp_images/
-exported_screenshots/
-NEXUS_Foundry_Screenshots.zip
-NEXUS_Foundry_Platform_Detailed_Report.pdf
-
 # Python
 __pycache__/
 *.py[cod]
@@ -125,27 +41,6 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
-
-# Virtual environments
-.venv/
-
-# Large ML model files (use Git LFS or external storage)
-models/*.h5
-models/*.keras
-models/*.pkl
-models/*.pt
-models/*.pth
-backend/models/*.h5
-backend/models/*.keras
-backend/models/*.pkl
-backend/models/*.pt
-backend/models/*.pth
-
-# Temp files
-temp_images/
-exported_screenshots/
-NEXUS_Foundry_Screenshots.zip
-NEXUS_Foundry_Platform_Detailed_Report.pdf
 
 # Large dataset files exceeding GitHub 100MB limit
 Datasets/*.csv
@@ -160,26 +55,5 @@ Datasets/*.npy
 !Datasets/pouring_sensor.csv
 !Datasets/production_master.csv
 !Datasets/xgboost_features.csv
-
-# Virtual environments
-.venv/
-
-# Large ML model files (use Git LFS or external storage)
-models/*.h5
-models/*.keras
-models/*.pkl
-models/*.pt
-models/*.pth
-backend/models/*.h5
-backend/models/*.keras
-backend/models/*.pkl
-backend/models/*.pt
-backend/models/*.pth
-
-# Temp files
-temp_images/
-exported_screenshots/
-NEXUS_Foundry_Screenshots.zip
-NEXUS_Foundry_Platform_Detailed_Report.pdf
 
 
